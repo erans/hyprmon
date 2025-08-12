@@ -175,7 +175,9 @@ Before any configuration changes, HyprMon creates a backup:
 
 ## License
 
-MIT License - See LICENSE file for details
+Apache License 2.0 - See [LICENSE](LICENSE) file for details
+
+Copyright 2025 Eran Sandler
 
 ## Contributing
 
