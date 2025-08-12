@@ -18,7 +18,7 @@ HyprMon is a TUI (Terminal User Interface) tool for configuring monitors on Arch
 
 ![Main Screen](./img/hyprmon.png)
 
-![Profiles Screen](./hyprmon-profiles.png)
+![Profiles Screen](./img/hyprmon-profiles.png)
 
 ## Installation
 
