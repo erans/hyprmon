@@ -11,11 +11,13 @@ import (
 
 func main() {
 	var profileName string
-	var listProfiles bool
+	var showProfileMenu bool
+	var listProfilesNames bool
 	var showVersion bool
 
 	flag.StringVar(&profileName, "profile", "", "Apply a specific profile")
-	flag.BoolVar(&listProfiles, "profiles", false, "Show profile selection menu")
+	flag.BoolVar(&showProfileMenu, "profiles", false, "Show profile selection menu")
+	flag.BoolVar(&listProfilesNames, "list-profiles", false, "List available profile names")
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
 	flag.BoolVar(&showVersion, "v", false, "Show version information (short)")
 	flag.Parse()
@@ -26,8 +28,50 @@ func main() {
 		return
 	}
 
+	// Handle list-profiles flag
+	if listProfilesNames {
+		profiles, err := listProfiles()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error listing profiles: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Load saved order if exists
+		savedOrder, _ := loadProfileOrder()
+		if len(savedOrder) > 0 {
+			// Apply saved order
+			orderedProfiles := []string{}
+			remainingProfiles := make(map[string]bool)
+
+			for _, p := range profiles {
+				remainingProfiles[p] = true
+			}
+
+			for _, name := range savedOrder {
+				if remainingProfiles[name] {
+					orderedProfiles = append(orderedProfiles, name)
+					delete(remainingProfiles, name)
+				}
+			}
+
+			for _, p := range profiles {
+				if remainingProfiles[p] {
+					orderedProfiles = append(orderedProfiles, p)
+				}
+			}
+
+			profiles = orderedProfiles
+		}
+
+		// Print one profile name per line for easy scripting
+		for _, profile := range profiles {
+			fmt.Println(profile)
+		}
+		return
+	}
+
 	if len(os.Args) > 1 && os.Args[1] == "profiles" {
-		listProfiles = true
+		showProfileMenu = true
 	}
 
 	if profileName != "" {
@@ -39,7 +83,7 @@ func main() {
 		return
 	}
 
-	if listProfiles {
+	if showProfileMenu {
 		m, err := initialProfileMenu()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error loading profiles: %v\n", err)
@@ -47,26 +91,61 @@ func main() {
 		}
 
 		p := tea.NewProgram(m, tea.WithAltScreen())
-		if _, err := p.Run(); err != nil {
+		finalModel, err := p.Run()
+		if err != nil {
 			log.Fatal(err)
 			os.Exit(1)
 		}
-		return
+
+		// Check if we should launch the full UI
+		if profileModel, ok := finalModel.(profileMenuModel); ok && profileModel.launchFullUI {
+			// Continue to launch full UI below
+		} else {
+			return
+		}
 	}
 
-	m := initialModel()
-	p := tea.NewProgram(m, tea.WithMouseCellMotion(), tea.WithAltScreen())
+	// Main UI loop - may need to restart if switching between views
+	for {
+		m := initialModel()
+		p := tea.NewProgram(m, tea.WithMouseCellMotion(), tea.WithAltScreen())
 
-	if _, err := p.Run(); err != nil {
-		log.Fatal(err)
-		os.Exit(1)
+		finalModel, err := p.Run()
+		if err != nil {
+			log.Fatal(err)
+			os.Exit(1)
+		}
+
+		// Check if we should open profiles page
+		if mainModel, ok := finalModel.(model); ok && mainModel.OpenProfiles {
+			// Launch profiles page
+			profileModel, err := initialProfileMenu()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error loading profiles: %v\n", err)
+				os.Exit(1)
+			}
+
+			profileProg := tea.NewProgram(profileModel, tea.WithAltScreen())
+			finalProfileModel, err := profileProg.Run()
+			if err != nil {
+				log.Fatal(err)
+				os.Exit(1)
+			}
+
+			// Check if we should return to main UI
+			if pm, ok := finalProfileModel.(profileMenuModel); ok && pm.launchFullUI {
+				continue // Go back to main UI
+			}
+			break // Exit completely
+		}
+		break // Normal exit
 	}
 }
 
 func initialModel() model {
 	m := model{
 		GridPx:     32,
-		Snap:       SnapOff,
+		Snap:       SnapEdges,
 		SnapThresh: 10,
 		Status:     "Loading monitors...",
 	}

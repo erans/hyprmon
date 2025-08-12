@@ -15,6 +15,21 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Handle help screen if it's shown
+	if m.ShowHelp {
+		switch msg.(type) {
+		case tea.KeyMsg:
+			// Any key closes the help
+			m.ShowHelp = false
+			return m, nil
+		case tea.MouseMsg:
+			// Any mouse action closes the help
+			m.ShowHelp = false
+			return m, nil
+		}
+		return m, nil
+	}
+
 	// Handle profile input if it's shown
 	if m.ShowProfileInput {
 		switch msg := msg.(type) {
@@ -146,10 +161,14 @@ func (m model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		case tea.MouseButtonRight:
 			hit := m.hitTest(msg.X, msg.Y-2)
 			if hit >= 0 {
-				m.Monitors[hit].Active = !m.Monitors[hit].Active
-				m.Status = fmt.Sprintf("Monitor %s: %s",
-					m.Monitors[hit].Name,
-					map[bool]string{true: "Active", false: "Inactive"}[m.Monitors[hit].Active])
+				if m.canDisableMonitor(hit) {
+					m.Monitors[hit].Active = !m.Monitors[hit].Active
+					m.Status = fmt.Sprintf("Monitor %s: %s",
+						m.Monitors[hit].Name,
+						map[bool]string{true: "Active", false: "Inactive"}[m.Monitors[hit].Active])
+				} else {
+					m.Status = "Cannot disable the last active monitor"
+				}
 			}
 		case tea.MouseButtonWheelUp:
 			if m.Selected >= 0 && m.Selected < len(m.Monitors) {
@@ -181,6 +200,10 @@ func (m model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "?":
+		m.ShowHelp = true
+		return m, nil
+
 	case "q", "ctrl+c":
 		return m, tea.Quit
 
@@ -307,20 +330,6 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		snapNames := []string{"Off", "Edges", "Centers", "Both"}
 		m.Status = fmt.Sprintf("Snap: %s", snapNames[m.Snap])
 
-	case "]":
-		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
-			mon := &m.Monitors[m.Selected]
-			mon.Scale = clamp(mon.Scale+0.05, 0.5, 3.0)
-			m.Status = fmt.Sprintf("Scale: %.2f", mon.Scale)
-		}
-
-	case "[":
-		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
-			mon := &m.Monitors[m.Selected]
-			mon.Scale = clamp(mon.Scale-0.05, 0.5, 3.0)
-			m.Status = fmt.Sprintf("Scale: %.2f", mon.Scale)
-		}
-
 	case "r", "R":
 		// Open scale picker for selected monitor
 		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
@@ -339,6 +348,11 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "z", "Z":
 		return m, revertCmd()
 
+	case "o", "O":
+		// Open profiles page
+		m.OpenProfiles = true
+		return m, tea.Quit
+
 	case "p", "P":
 		// Show profile input dialog
 		m.ProfileInput = newProfileInput()
@@ -346,7 +360,14 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "enter", " ":
 		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
-			m.Monitors[m.Selected].Active = !m.Monitors[m.Selected].Active
+			if m.canDisableMonitor(m.Selected) {
+				m.Monitors[m.Selected].Active = !m.Monitors[m.Selected].Active
+				m.Status = fmt.Sprintf("Monitor %s: %s",
+					m.Monitors[m.Selected].Name,
+					map[bool]string{true: "Active", false: "Inactive"}[m.Monitors[m.Selected].Active])
+			} else {
+				m.Status = "Cannot disable the last active monitor"
+			}
 		}
 	}
 

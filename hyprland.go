@@ -40,7 +40,7 @@ type hyprMonitor struct {
 }
 
 func readMonitors() ([]Monitor, error) {
-	cmd := exec.Command("hyprctl", "monitors", "-j")
+	cmd := exec.Command("hyprctl", "monitors", "all", "-j")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute hyprctl: %w", err)
@@ -75,54 +75,7 @@ func readMonitors() ([]Monitor, error) {
 		monitors = append(monitors, monitor)
 	}
 
-	inactiveMonitors := readInactiveMonitors()
-	monitors = append(monitors, inactiveMonitors...)
-
 	return monitors, nil
-}
-
-func readInactiveMonitors() []Monitor {
-	cmd := exec.Command("wlr-randr")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil
-	}
-
-	var monitors []Monitor
-	lines := strings.Split(string(output), "\n")
-	var currentMonitor *Monitor
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasSuffix(line, "(disabled)") {
-			parts := strings.Fields(line)
-			if len(parts) > 0 {
-				if currentMonitor != nil {
-					monitors = append(monitors, *currentMonitor)
-				}
-				currentMonitor = &Monitor{
-					Name:   parts[0],
-					Active: false,
-					Scale:  1.0,
-				}
-			}
-		} else if currentMonitor != nil && strings.Contains(line, "x") && strings.Contains(line, "@") {
-			if mode := parseWlrMode(line); mode != nil {
-				currentMonitor.Modes = append(currentMonitor.Modes, *mode)
-				if strings.Contains(line, "current") && currentMonitor.PxW == 0 {
-					currentMonitor.PxW = mode.W
-					currentMonitor.PxH = mode.H
-					currentMonitor.Hz = mode.Hz
-				}
-			}
-		}
-	}
-
-	if currentMonitor != nil {
-		monitors = append(monitors, *currentMonitor)
-	}
-
-	return monitors
 }
 
 func parseMode(modeStr string) *Mode {
@@ -157,37 +110,6 @@ func parseMode(modeStr string) *Mode {
 		H:  uint32(h),
 		Hz: float32(hz),
 	}
-}
-
-func parseWlrMode(line string) *Mode {
-	parts := strings.Fields(line)
-	for _, part := range parts {
-		if strings.Contains(part, "x") && !strings.Contains(part, "px") {
-			resParts := strings.Split(part, "x")
-			if len(resParts) == 2 {
-				w, errW := strconv.ParseUint(resParts[0], 10, 32)
-				h, errH := strconv.ParseUint(resParts[1], 10, 32)
-				if errW == nil && errH == nil {
-					hz := float32(60.0)
-					for _, p := range parts {
-						if strings.HasSuffix(p, "Hz") {
-							hzStr := strings.TrimSuffix(p, "Hz")
-							if hzVal, err := strconv.ParseFloat(hzStr, 32); err == nil {
-								hz = float32(hzVal)
-								break
-							}
-						}
-					}
-					return &Mode{
-						W:  uint32(w),
-						H:  uint32(h),
-						Hz: hz,
-					}
-				}
-			}
-		}
-	}
-	return nil
 }
 
 func applyMonitor(m Monitor) error {

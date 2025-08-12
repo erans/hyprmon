@@ -71,6 +71,8 @@ type model struct {
 	ScalePicker      scalePickerModel
 	ShowProfileInput bool
 	ProfileInput     profileInputModel
+	ShowHelp         bool
+	OpenProfiles     bool // Flag to open profiles page
 }
 
 type initMsg struct {
@@ -261,4 +263,26 @@ func abs(x int32) int32 {
 		return -x
 	}
 	return x
+}
+
+func (m *model) countActiveMonitors() int {
+	count := 0
+	for _, mon := range m.Monitors {
+		if mon.Active {
+			count++
+		}
+	}
+	return count
+}
+
+func (m *model) canDisableMonitor(index int) bool {
+	if index < 0 || index >= len(m.Monitors) {
+		return false
+	}
+
+	if !m.Monitors[index].Active {
+		return true
+	}
+
+	return m.countActiveMonitors() > 1
 }

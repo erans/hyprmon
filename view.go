@@ -42,6 +42,11 @@ var (
 )
 
 func (m model) View() string {
+	// Show help if active
+	if m.ShowHelp {
+		return m.renderHelp()
+	}
+
 	// Show profile input if active
 	if m.ShowProfileInput {
 		return m.ProfileInput.View()
@@ -78,8 +83,91 @@ func (m model) View() string {
 	return b.String()
 }
 
+func (m model) renderHelp() string {
+	helpStyle := lipgloss.NewStyle().
+		Padding(2, 4).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("214"))
+
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("214")).
+		MarginBottom(1)
+
+	sectionStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("42")).
+		MarginTop(1).
+		MarginBottom(1)
+
+	keyStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("214")).
+		Width(20)
+
+	var content strings.Builder
+
+	// Title and version
+	content.WriteString(titleStyle.Render(fmt.Sprintf("HyprMon %s", ShortVersion())))
+	content.WriteString("\n")
+	content.WriteString("Copyright © 2025 Eran Sandler\n\n")
+	content.WriteString("A visual monitor configuration tool for Hyprland window manager.\n")
+
+	// Keyboard shortcuts
+	content.WriteString(sectionStyle.Render("\nKeyboard Shortcuts:"))
+	content.WriteString("\n")
+
+	shortcuts := []struct {
+		key  string
+		desc string
+	}{
+		{"↑↓←→", "Move selected monitor"},
+		{"Shift+↑↓←→", "Move by 10x step"},
+		{"Tab / Shift+Tab", "Select next/previous monitor"},
+		{"Enter / Space", "Toggle monitor on/off"},
+		{"G", "Cycle grid size (1, 8, 16, 32, 64 px)"},
+		{"L", "Cycle snap mode (Off, Edges, Centers, Both)"},
+		{"R", "Open scale adjustment dialog"},
+		{"A", "Apply changes to Hyprland"},
+		{"S", "Save configuration to file"},
+		{"O", "Open profiles page"},
+		{"P", "Save as profile"},
+		{"Z", "Revert to previous configuration"},
+		{"?", "Show this help"},
+		{"Q / Ctrl+C", "Quit"},
+	}
+
+	for _, s := range shortcuts {
+		content.WriteString(fmt.Sprintf("%s %s\n",
+			keyStyle.Render(s.key), s.desc))
+	}
+
+	// Mouse controls
+	content.WriteString(sectionStyle.Render("\nMouse Controls:"))
+	content.WriteString("\n")
+
+	mouseControls := []struct {
+		action string
+		desc   string
+	}{
+		{"Left Click", "Select monitor"},
+		{"Drag", "Move selected monitor"},
+		{"Right Click", "Toggle monitor on/off"},
+		{"Scroll Wheel", "Adjust scale"},
+	}
+
+	for _, m := range mouseControls {
+		content.WriteString(fmt.Sprintf("%s %s\n",
+			keyStyle.Render(m.action), m.desc))
+	}
+
+	content.WriteString("\n")
+	content.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render("Press any key to close help"))
+
+	return helpStyle.Render(content.String())
+}
+
 func (m model) renderHeader() string {
-	legend := "● Active  ○ Inactive"
+	legend := "[ON] Active  [OFF] Inactive"
 	grid := fmt.Sprintf("Grid: %d px", m.GridPx)
 	snapNames := []string{"Off", "Edges", "Centers", "Both"}
 	snap := fmt.Sprintf("Snap: %s", snapNames[m.Snap])
@@ -165,6 +253,15 @@ func (m model) renderMonitor(desktop [][]rune, mon Monitor, selected bool) {
 
 	boxRunes := m.getBoxRunes(style)
 
+	// Fill background with dots for inactive monitors
+	if !mon.Active {
+		for y := ty1 + 1; y < ty2 && y < len(desktop); y++ {
+			for x := tx1 + 1; x < tx2 && x < len(desktop[0]); x++ {
+				desktop[y][x] = '·'
+			}
+		}
+	}
+
 	for y := ty1; y <= ty2 && y < len(desktop); y++ {
 		for x := tx1; x <= tx2 && x < len(desktop[0]); x++ {
 			if y == ty1 {
@@ -191,7 +288,12 @@ func (m model) renderMonitor(desktop [][]rune, mon Monitor, selected bool) {
 		}
 	}
 
-	nameLabel := mon.Name
+	// Add monitor name with [ON]/[OFF] status
+	statusLabel := "[ON]"
+	if !mon.Active {
+		statusLabel = "[OFF]"
+	}
+	nameLabel := fmt.Sprintf("%s %s", mon.Name, statusLabel)
 	if len(nameLabel) > tx2-tx1-2 {
 		nameLabel = nameLabel[:tx2-tx1-2]
 	}
@@ -203,26 +305,29 @@ func (m model) renderMonitor(desktop [][]rune, mon Monitor, selected bool) {
 		}
 	}
 
-	resLabel := fmt.Sprintf("%dx%d@%.0fHz", mon.PxW, mon.PxH, mon.Hz)
-	if len(resLabel) > tx2-tx1-2 {
-		resLabel = resLabel[:tx2-tx1-2]
-	}
-	if ty1+2 < len(desktop) && ty1+2 < ty2 && tx1+1 < len(desktop[0]) {
-		for i, r := range resLabel {
-			if tx1+1+i < tx2 {
-				desktop[ty1+2][tx1+1+i] = r
+	// Only show details for active monitors (dimmed effect for inactive)
+	if mon.Active {
+		resLabel := fmt.Sprintf("%dx%d@%.0fHz", mon.PxW, mon.PxH, mon.Hz)
+		if len(resLabel) > tx2-tx1-2 {
+			resLabel = resLabel[:tx2-tx1-2]
+		}
+		if ty1+2 < len(desktop) && ty1+2 < ty2 && tx1+1 < len(desktop[0]) {
+			for i, r := range resLabel {
+				if tx1+1+i < tx2 {
+					desktop[ty1+2][tx1+1+i] = r
+				}
 			}
 		}
-	}
 
-	scaleLabel := fmt.Sprintf("x%.2f", mon.Scale)
-	if len(scaleLabel) > tx2-tx1-2 {
-		scaleLabel = scaleLabel[:tx2-tx1-2]
-	}
-	if ty1+3 < len(desktop) && ty1+3 < ty2 && tx1+1 < len(desktop[0]) {
-		for i, r := range scaleLabel {
-			if tx1+1+i < tx2 {
-				desktop[ty1+3][tx1+1+i] = r
+		scaleLabel := fmt.Sprintf("x%.2f", mon.Scale)
+		if len(scaleLabel) > tx2-tx1-2 {
+			scaleLabel = scaleLabel[:tx2-tx1-2]
+		}
+		if ty1+3 < len(desktop) && ty1+3 < ty2 && tx1+1 < len(desktop[0]) {
+			for i, r := range scaleLabel {
+				if tx1+1+i < tx2 {
+					desktop[ty1+3][tx1+1+i] = r
+				}
 			}
 		}
 	}
@@ -267,19 +372,21 @@ func (m model) renderFooter() string {
 		"↑↓←→ move",
 		"Shift+↑↓←→ step×10",
 		"Tab select",
+		"Enter toggle",
 		"G grid",
 		"L snap",
 		"R scale",
-		"[/] ±0.05",
 		"A apply",
 		"S save",
-		"P profile",
+		"O profiles",
+		"P save profile",
 		"Z revert",
+		"? help",
 		"Q quit",
 	}
 
 	if m.World.TermW > 100 {
-		keys = append(keys, "Drag to move", "Wheel to scale")
+		keys = append(keys, "Drag to move", "Right-click toggle", "Wheel to scale")
 	}
 
 	return footerStyle.Render(strings.Join(keys, "  •  "))
