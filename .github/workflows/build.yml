@@ -1,0 +1,210 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  pull_request:
+    branches: [main]
+
+env:
+  GO_VERSION: "1.24"
+  BINARY_NAME: hyprmon
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            suffix: linux-amd64
+          - goos: linux
+            goarch: arm64
+            suffix: linux-arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for git describe
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Get version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Building version: ${VERSION}"
+
+      - name: Get dependencies
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          LDFLAGS="-s -w"
+          LDFLAGS="${LDFLAGS} -X main.Version=${VERSION}"
+          LDFLAGS="${LDFLAGS} -X main.GitCommit=${GIT_COMMIT}"
+          LDFLAGS="${LDFLAGS} -X main.BuildDate=${BUILD_DATE}"
+
+          go build -ldflags="${LDFLAGS}" -o ${{ env.BINARY_NAME }}-${{ matrix.suffix }}
+
+          # Make binary executable
+          chmod +x ${{ env.BINARY_NAME }}-${{ matrix.suffix }}
+
+      - name: Test binary version
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        run: |
+          ./${{ env.BINARY_NAME }}-${{ matrix.suffix }} --version
+
+      - name: Compress binary
+        run: |
+          tar czf ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.tar.gz ${{ env.BINARY_NAME }}-${{ matrix.suffix }} README.md LICENSE
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BINARY_NAME }}-${{ matrix.suffix }}
+          path: ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.tar.gz
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "CHANGELOG=Initial release" >> $GITHUB_OUTPUT
+          else
+            # Generate changelog between tags
+            CHANGELOG=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD | grep -v "^- Merge" || echo "No changes")
+
+            # Escape multiline string for GitHub Actions
+            CHANGELOG="${CHANGELOG//'%'/'%25'}"
+            CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
+            CHANGELOG="${CHANGELOG//$'\r'/'%0D'}"
+
+            echo "CHANGELOG=${CHANGELOG}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            ## Changes
+            ${{ steps.changelog.outputs.CHANGELOG }}
+
+            ## Installation
+
+            ### Linux AMD64
+            ```bash
+            wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/hyprmon-linux-amd64.tar.gz
+            tar xzf hyprmon-linux-amd64.tar.gz
+            sudo mv hyprmon-linux-amd64 /usr/local/bin/hyprmon
+            ```
+
+            ### Linux ARM64
+            ```bash
+            wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/hyprmon-linux-arm64.tar.gz
+            tar xzf hyprmon-linux-arm64.tar.gz
+            sudo mv hyprmon-linux-arm64 /usr/local/bin/hyprmon
+            ```
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Assets
+        run: |
+          for file in ./artifacts/*/*.tar.gz; do
+            asset_name=$(basename "$file")
+            echo "Uploading $asset_name"
+
+            gh release upload "${{ github.ref_name }}" "$file" \
+              --repo "${{ github.repository }}"
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Get dependencies
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run go fmt check
+        run: |
+          fmt_output=$(go fmt ./...)
+          if [ -n "$fmt_output" ]; then
+            echo "The following files need formatting:"
+            echo "$fmt_output"
+            exit 1
+          fi
+
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+      - name: Upload coverage
+        if: success()
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.txt
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false

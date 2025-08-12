@@ -1,0 +1,176 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., v1.0.0)"
+        required: true
+        type: string
+
+env:
+  GO_VERSION: "1.24"
+  BINARY_NAME: hyprmon
+
+jobs:
+  create-tag:
+    name: Create Tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag_exists: ${{ steps.check_tag.outputs.exists }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse "${{ github.event.inputs.version }}" >/dev/null 2>&1; then
+            echo "Tag ${{ github.event.inputs.version }} already exists"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push tag
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git tag -a "${{ github.event.inputs.version }}" -m "Release ${{ github.event.inputs.version }}"
+          git push origin "${{ github.event.inputs.version }}"
+
+  build-release:
+    name: Build and Release
+    needs: create-tag
+    if: needs.create-tag.outputs.tag_exists == 'false'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            suffix: linux-amd64
+          - goos: linux
+            goarch: arm64
+            suffix: linux-arm64
+          - goos: linux
+            goarch: 386
+            suffix: linux-386
+          - goos: linux
+            goarch: arm
+            goarm: 7
+            suffix: linux-armv7
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: 0
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          LDFLAGS="-s -w"
+          LDFLAGS="${LDFLAGS} -X main.Version=${VERSION}"
+          LDFLAGS="${LDFLAGS} -X main.GitCommit=${GIT_COMMIT}"
+          LDFLAGS="${LDFLAGS} -X main.BuildDate=${BUILD_DATE}"
+
+          go build -ldflags="${LDFLAGS}" -o ${{ env.BINARY_NAME }}-${{ matrix.suffix }}
+          chmod +x ${{ env.BINARY_NAME }}-${{ matrix.suffix }}
+
+      - name: Create checksum
+        run: |
+          sha256sum ${{ env.BINARY_NAME }}-${{ matrix.suffix }} > ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.sha256
+
+      - name: Compress binary
+        run: |
+          tar czf ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.tar.gz \
+            ${{ env.BINARY_NAME }}-${{ matrix.suffix }} \
+            README.md \
+            LICENSE
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BINARY_NAME }}-${{ matrix.suffix }}
+          path: |
+            ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.tar.gz
+            ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.sha256
+
+  create-release:
+    name: Create GitHub Release
+    needs: build-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+          fetch-depth: 0
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Create release notes
+        id: release_notes
+        run: |
+          cat << EOF > release_notes.md
+          ## HyprMon ${{ github.event.inputs.version }}
+
+          ### Installation
+
+          #### Linux AMD64
+          \`\`\`bash
+          wget https://github.com/${{ github.repository }}/releases/download/${{ github.event.inputs.version }}/hyprmon-linux-amd64.tar.gz
+          tar xzf hyprmon-linux-amd64.tar.gz
+          sudo install -m 755 hyprmon-linux-amd64 /usr/local/bin/hyprmon
+          \`\`\`
+
+          #### Linux ARM64
+          \`\`\`bash
+          wget https://github.com/${{ github.repository }}/releases/download/${{ github.event.inputs.version }}/hyprmon-linux-arm64.tar.gz
+          tar xzf hyprmon-linux-arm64.tar.gz
+          sudo install -m 755 hyprmon-linux-arm64 /usr/local/bin/hyprmon
+          \`\`\`
+
+          ### Checksums
+          Verify your download with the provided .sha256 files.
+
+          ### What's New
+          See [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: Release ${{ github.event.inputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          files: |
+            ./artifacts/**/*.tar.gz
+            ./artifacts/**/*.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

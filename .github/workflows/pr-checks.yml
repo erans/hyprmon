@@ -1,0 +1,128 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  GO_VERSION: "1.24"
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          args: --timeout=5m
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: ./...
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: "trivy-results.sarif"
+
+  license:
+    name: License Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check license headers
+        run: |
+          # Check if LICENSE file exists
+          if [ ! -f "LICENSE" ]; then
+            echo "ERROR: LICENSE file not found"
+            exit 1
+          fi
+
+          # Verify it's Apache 2.0
+          if ! grep -q "Apache License" LICENSE; then
+            echo "ERROR: LICENSE file should contain Apache License 2.0"
+            exit 1
+          fi
+
+          echo "License check passed"
+
+  build-test:
+    name: Build Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux]
+        goarch: [amd64, arm64, 386]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Test Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          go build -o /tmp/hyprmon-test
+
+  check-docs:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check README
+        run: |
+          if [ ! -f "README.md" ]; then
+            echo "ERROR: README.md not found"
+            exit 1
+          fi
+
+          # Check for required sections
+          for section in "Installation" "Usage" "Features" "License"; do
+            if ! grep -q "## $section" README.md; then
+              echo "WARNING: README.md should have a '## $section' section"
+            fi
+          done
+
+          echo "Documentation check completed"
