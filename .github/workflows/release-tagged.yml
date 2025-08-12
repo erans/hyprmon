@@ -126,13 +126,10 @@ jobs:
           fi
 
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           body: |
             ## Changes
             ${{ steps.changelog.outputs.CHANGELOG }}
@@ -154,16 +151,8 @@ jobs:
             ```
           draft: false
           prerelease: false
-
-      - name: Upload Release Assets
-        run: |
-          for file in ./artifacts/*/*.tar.gz; do
-            asset_name=$(basename "$file")
-            echo "Uploading $asset_name"
-
-            gh release upload "${{ github.ref_name }}" "$file" \
-              --repo "${{ github.repository }}"
-          done
+          files: |
+            ./artifacts/*/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
