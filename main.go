@@ -7,6 +7,7 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"golang.org/x/term"
 )
 
 func main() {
@@ -150,9 +151,16 @@ func initialModel() model {
 		Status:     "Loading monitors...",
 	}
 
-	// Set initial terminal size to prevent "Initializing..." stuck state
-	m.World.TermW = 80
-	m.World.TermH = 24
+	// Try to get actual terminal size
+	width, height, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		// Fall back to defaults if we can't get terminal size
+		m.World.TermW = 80
+		m.World.TermH = 24
+	} else {
+		m.World.TermW = width
+		m.World.TermH = height
+	}
 
 	// Don't load monitors here - let the Init command do it
 	// This ensures proper async loading
