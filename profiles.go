@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/term"
 )
 
 type Profile struct {
@@ -215,6 +216,8 @@ type profileMenuModel struct {
 	profileOrder    []string // Keep track of custom order
 	showHelp        bool
 	launchFullUI    bool // Flag to indicate launching full UI
+	termWidth       int  // Terminal width for responsive layout
+	termHeight      int  // Terminal height
 }
 
 func initialProfileMenu() (profileMenuModel, error) {
@@ -262,19 +265,34 @@ func initialProfileMenu() (profileMenuModel, error) {
 	profiles = append(profiles, "──────────────────")
 	profiles = append(profiles, "[ Open Full UI ]")
 
+	// Try to get terminal size
+	width, height, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		// Fall back to defaults if we can't get terminal size
+		width = 80
+		height = 24
+	}
+
 	return profileMenuModel{
 		profiles:     profiles,
 		selected:     0,
 		profileOrder: profileOrder,
+		termWidth:    width,
+		termHeight:   height,
 	}, nil
 }
 
 func (m profileMenuModel) Init() tea.Cmd {
-	return nil
+	return tea.WindowSize()
 }
 
 func (m profileMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.termWidth = msg.Width
+		m.termHeight = msg.Height
+		return m, nil
+
 	case tea.KeyMsg:
 		// Handle help screen first
 		if m.showHelp {
@@ -696,11 +714,170 @@ func (m profileMenuModel) View() string {
 
 	s.WriteString("\n")
 
+	// Render responsive footer
+	s.WriteString(m.renderFooter())
+
+	return s.String()
+}
+
+// profileKeyCommand represents a keyboard command with different verbosity levels for profile menu
+type profileKeyCommand struct {
+	full     string
+	medium   string
+	short    string
+	priority int // 1 = essential, 2 = important, 3 = nice to have
+}
+
+func (m profileMenuModel) renderFooter() string {
+	commands := []profileKeyCommand{
+		{"↑/↓ Navigate", "↑/↓ Nav", "↑↓", 1},
+		{"Shift+↑/↓ Reorder", "S+↑/↓ Order", "S+↑↓", 2},
+		{"Enter Select", "Enter Sel", "⏎", 1},
+		{"R Rename", "R Rename", "R", 2},
+		{"D Delete", "D Delete", "D", 2},
+		{"? Help", "? Help", "?", 1},
+		{"Q Quit", "Q Quit", "Q", 1},
+	}
+
+	// Determine format based on terminal width
+	var keys []string
+	separator := "  •  "
+
+	width := m.termWidth
+	if width <= 0 {
+		width = 80 // Fallback
+	}
+
+	if width < 60 {
+		// Very narrow: only essential commands, shortest form
+		separator = " "
+		for _, cmd := range commands {
+			if cmd.priority == 1 {
+				keys = append(keys, cmd.short)
+			}
+		}
+	} else if width < 80 {
+		// Narrow: essential and important, short form
+		separator = " • "
+		for _, cmd := range commands {
+			if cmd.priority <= 2 {
+				keys = append(keys, cmd.short)
+			}
+		}
+	} else if width < 100 {
+		// Medium: all commands, medium form
+		separator = " • "
+		for _, cmd := range commands {
+			keys = append(keys, cmd.medium)
+		}
+	} else {
+		// Wide: all commands, full form
+		for _, cmd := range commands {
+			keys = append(keys, cmd.full)
+		}
+	}
+
+	// Check if the footer would overflow and switch to multi-line if needed
+	footerText := strings.Join(keys, separator)
+	if len(footerText) > width-4 && width >= 60 {
+		// Try multi-line layout for medium and wider terminals
+		return m.renderMultiLineFooter(commands, width, keys, separator)
+	}
+
 	helpStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("241"))
 
-	help := "↑/↓: Navigate  •  Shift+↑/↓: Reorder  •  Enter: Select  •  R: Rename  •  D: Delete  •  ?: Help  •  Q: Quit"
-	s.WriteString(helpStyle.Render(help))
+	return helpStyle.Render(footerText)
+}
 
-	return s.String()
+func (m profileMenuModel) renderMultiLineFooter(commands []profileKeyCommand, width int, singleLineKeys []string, separator string) string {
+	var lines []string
+	var currentLine []string
+	var currentLength int
+
+	sepLen := len(separator)
+
+	// Helper function to add text to current line or start new line
+	addToLine := func(text string) {
+		textLen := len(text)
+		wouldOverflow := len(currentLine) > 0 && currentLength+sepLen+textLen > width-4
+
+		if wouldOverflow && len(lines) < 3 {
+			// Start new line if we haven't reached 3 lines yet
+			lines = append(lines, strings.Join(currentLine, separator))
+			currentLine = []string{text}
+			currentLength = textLen
+		} else if !wouldOverflow {
+			// Add to current line
+			currentLine = append(currentLine, text)
+			if len(currentLine) > 1 {
+				currentLength += sepLen
+			}
+			currentLength += textLen
+		}
+		// If we would overflow and already have 3 lines, skip this item
+	}
+
+	// First, try with the keys we already have (based on width)
+	for _, key := range singleLineKeys {
+		addToLine(key)
+	}
+
+	// Add remaining line if exists
+	if len(currentLine) > 0 {
+		lines = append(lines, strings.Join(currentLine, separator))
+	}
+
+	// If we're using more than 3 lines, we need to be more selective
+	if len(lines) > 3 {
+		lines = []string{}
+		currentLine = []string{}
+		currentLength = 0
+
+		// Use progressively shorter forms until it fits in 3 lines
+		attempts := []struct {
+			priority int
+			format   string
+		}{
+			{3, "medium"}, // All commands, medium form
+			{3, "short"},  // All commands, short form
+			{2, "short"},  // Important and essential only, short form
+			{1, "short"},  // Essential only, short form
+		}
+
+		for _, attempt := range attempts {
+			lines = []string{}
+			currentLine = []string{}
+			currentLength = 0
+
+			for _, cmd := range commands {
+				if cmd.priority <= attempt.priority {
+					var text string
+					switch attempt.format {
+					case "full":
+						text = cmd.full
+					case "medium":
+						text = cmd.medium
+					case "short":
+						text = cmd.short
+					}
+					addToLine(text)
+				}
+			}
+
+			if len(currentLine) > 0 {
+				lines = append(lines, strings.Join(currentLine, separator))
+			}
+
+			// If it fits in 3 lines, we're done
+			if len(lines) <= 3 {
+				break
+			}
+		}
+	}
+
+	helpStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("241"))
+
+	return helpStyle.Render(strings.Join(lines, "\n"))
 }

@@ -72,6 +72,7 @@ type model struct {
 	ShowProfileInput bool
 	ProfileInput     profileInputModel
 	ShowHelp         bool
+	HelpScrollOffset int  // Scroll position for help screen
 	OpenProfiles     bool // Flag to open profiles page
 }
 
@@ -123,14 +124,22 @@ func (m *model) updateWorld() {
 }
 
 func (m *model) worldToTerm(x, y int32) (int, int) {
-	termX := int(float32(x-m.World.OffsetX) * float32(m.World.TermW) / float32(m.World.Width))
-	termY := int(float32(y-m.World.OffsetY) * float32(m.World.TermH) / float32(m.World.Height))
+	// Use desktop dimensions (accounting for borders and UI elements)
+	desktopWidth := m.World.TermW - 3   // Border (2) + margin (1)
+	desktopHeight := m.World.TermH - 10 // Updated for 3-line footer
+
+	termX := int(float32(x-m.World.OffsetX) * float32(desktopWidth) / float32(m.World.Width))
+	termY := int(float32(y-m.World.OffsetY) * float32(desktopHeight) / float32(m.World.Height))
 	return termX, termY
 }
 
 func (m *model) termToWorld(x, y int) (int32, int32) {
-	worldX := int32(float32(x)*float32(m.World.Width)/float32(m.World.TermW)) + m.World.OffsetX
-	worldY := int32(float32(y)*float32(m.World.Height)/float32(m.World.TermH)) + m.World.OffsetY
+	// Use desktop dimensions (accounting for borders and UI elements)
+	desktopWidth := m.World.TermW - 3   // Border (2) + margin (1)
+	desktopHeight := m.World.TermH - 10 // Updated for 3-line footer
+
+	worldX := int32(float32(x)*float32(m.World.Width)/float32(desktopWidth)) + m.World.OffsetX
+	worldY := int32(float32(y)*float32(m.World.Height)/float32(desktopHeight)) + m.World.OffsetY
 	return worldX, worldY
 }
 

@@ -11,20 +11,75 @@ func (m model) Init() tea.Cmd {
 	return tea.Batch(
 		loadMonitorsCmd(),
 		tea.EnterAltScreen,
+		tea.WindowSize(), // Request initial window size
 	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Handle help screen if it's shown
 	if m.ShowHelp {
-		switch msg.(type) {
+		switch msg := msg.(type) {
 		case tea.KeyMsg:
-			// Any key closes the help
-			m.ShowHelp = false
+			viewportHeight := m.World.TermH - 6
+			pageSize := viewportHeight - 7 // Account for header and footer
+
+			switch msg.String() {
+			case "esc", "q", "?":
+				// Close help
+				m.ShowHelp = false
+				m.HelpScrollOffset = 0 // Reset scroll when closing
+				return m, nil
+			case "up", "k":
+				// Scroll up one line
+				if m.HelpScrollOffset > 0 {
+					m.HelpScrollOffset--
+				}
+				return m, nil
+			case "down", "j":
+				// Scroll down one line
+				m.HelpScrollOffset++
+				return m, nil
+			case "pgup":
+				// Page up
+				m.HelpScrollOffset -= pageSize
+				if m.HelpScrollOffset < 0 {
+					m.HelpScrollOffset = 0
+				}
+				return m, nil
+			case "pgdown":
+				// Page down
+				m.HelpScrollOffset += pageSize
+				return m, nil
+			case "home":
+				// Jump to top
+				m.HelpScrollOffset = 0
+				return m, nil
+			case "end":
+				// Jump to bottom (will be clamped in renderHelp)
+				m.HelpScrollOffset = 9999
+				return m, nil
+			}
 			return m, nil
 		case tea.MouseMsg:
-			// Any mouse action closes the help
-			m.ShowHelp = false
+			if msg.Action == tea.MouseActionPress {
+				switch msg.Button {
+				case tea.MouseButtonWheelUp:
+					// Scroll up
+					if m.HelpScrollOffset > 0 {
+						m.HelpScrollOffset--
+					}
+					return m, nil
+				case tea.MouseButtonWheelDown:
+					// Scroll down
+					m.HelpScrollOffset++
+					return m, nil
+				default:
+					// Other mouse actions close help
+					m.ShowHelp = false
+					m.HelpScrollOffset = 0
+					return m, nil
+				}
+			}
 			return m, nil
 		}
 		return m, nil
@@ -92,8 +147,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.World.TermW = msg.Width - 2
-		m.World.TermH = msg.Height - 6
+		m.World.TermW = msg.Width
+		m.World.TermH = msg.Height
 		return m, nil
 
 	case initMsg:
@@ -107,7 +162,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Status = fmt.Sprintf("Loaded %d monitors", len(m.Monitors))
 			m.updateWorld()
 		}
-		return m, nil
+		// Force a window size refresh after initial load
+		return m, tea.WindowSize()
 
 	case tea.MouseMsg:
 		return m.handleMouse(msg)

@@ -84,10 +84,17 @@ func (m model) View() string {
 }
 
 func (m model) renderHelp() string {
-	helpStyle := lipgloss.NewStyle().
-		Padding(2, 4).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("214"))
+	// Calculate available viewport dimensions - leave margin to prevent cutoff
+	viewportHeight := m.World.TermH - 6 // Leave space for margins and prevent cutoff
+	viewportWidth := m.World.TermW - 10 // Account for border and padding
+
+	// Ensure minimum size
+	if viewportHeight < 10 {
+		viewportHeight = 10
+	}
+	if viewportWidth < 40 {
+		viewportWidth = 40
+	}
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -104,17 +111,18 @@ func (m model) renderHelp() string {
 		Foreground(lipgloss.Color("214")).
 		Width(20)
 
-	var content strings.Builder
+	// Build all content lines
+	var allLines []string
 
 	// Title and version
-	content.WriteString(titleStyle.Render(fmt.Sprintf("HyprMon %s", ShortVersion())))
-	content.WriteString("\n")
-	content.WriteString("Copyright © 2025 Eran Sandler\n\n")
-	content.WriteString("A visual monitor configuration tool for Hyprland window manager.\n")
+	allLines = append(allLines, titleStyle.Render(fmt.Sprintf("HyprMon %s", ShortVersion())))
+	allLines = append(allLines, "Copyright © 2025 Eran Sandler")
+	allLines = append(allLines, "")
+	allLines = append(allLines, "A visual monitor configuration tool for Hyprland window manager.")
+	allLines = append(allLines, "")
 
 	// Keyboard shortcuts
-	content.WriteString(sectionStyle.Render("\nKeyboard Shortcuts:"))
-	content.WriteString("\n")
+	allLines = append(allLines, sectionStyle.Render("Keyboard Shortcuts:"))
 
 	shortcuts := []struct {
 		key  string
@@ -137,13 +145,13 @@ func (m model) renderHelp() string {
 	}
 
 	for _, s := range shortcuts {
-		content.WriteString(fmt.Sprintf("%s %s\n",
+		allLines = append(allLines, fmt.Sprintf("%s %s",
 			keyStyle.Render(s.key), s.desc))
 	}
 
 	// Mouse controls
-	content.WriteString(sectionStyle.Render("\nMouse Controls:"))
-	content.WriteString("\n")
+	allLines = append(allLines, "")
+	allLines = append(allLines, sectionStyle.Render("Mouse Controls:"))
 
 	mouseControls := []struct {
 		action string
@@ -155,25 +163,97 @@ func (m model) renderHelp() string {
 		{"Scroll Wheel", "Adjust scale"},
 	}
 
-	for _, m := range mouseControls {
-		content.WriteString(fmt.Sprintf("%s %s\n",
-			keyStyle.Render(m.action), m.desc))
+	for _, mc := range mouseControls {
+		allLines = append(allLines, fmt.Sprintf("%s %s",
+			keyStyle.Render(mc.action), mc.desc))
 	}
 
-	content.WriteString("\n")
-	content.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render("Press any key to close help"))
+	// Navigation help
+	allLines = append(allLines, "")
+	allLines = append(allLines, sectionStyle.Render("Navigation (in this help):"))
+	allLines = append(allLines, fmt.Sprintf("%s %s", keyStyle.Render("↑/↓"), "Scroll up/down"))
+	allLines = append(allLines, fmt.Sprintf("%s %s", keyStyle.Render("PgUp/PgDn"), "Page up/down"))
+	allLines = append(allLines, fmt.Sprintf("%s %s", keyStyle.Render("Home/End"), "Jump to top/bottom"))
+	allLines = append(allLines, fmt.Sprintf("%s %s", keyStyle.Render("ESC/q"), "Close help"))
 
-	return helpStyle.Render(content.String())
+	// Calculate visible content based on scroll offset
+	totalLines := len(allLines)
+	contentHeight := viewportHeight - 5 // Reserve space for header/footer
+	maxScroll := totalLines - contentHeight
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+
+	// Ensure scroll offset is within bounds
+	scrollOffset := m.HelpScrollOffset
+	if scrollOffset < 0 {
+		scrollOffset = 0
+	}
+	if scrollOffset > maxScroll {
+		scrollOffset = maxScroll
+	}
+
+	// Build content without scroll bar
+	visibleLines := []string{}
+
+	// Get visible content lines
+	for i := scrollOffset; i < len(allLines) && i < scrollOffset+contentHeight; i++ {
+		visibleLines = append(visibleLines, allLines[i])
+	}
+
+	// Pad to fill viewport
+	for len(visibleLines) < contentHeight {
+		visibleLines = append(visibleLines, "")
+	}
+
+	// Add footer with navigation info
+	visibleLines = append(visibleLines, strings.Repeat("─", min(viewportWidth-6, 70)))
+
+	if totalLines > contentHeight {
+		// Show scroll info and navigation instructions
+		footerText := fmt.Sprintf("Lines %d-%d of %d • Use ↑↓ or PgUp/PgDn to scroll • ESC to close",
+			scrollOffset+1,
+			min(scrollOffset+contentHeight, totalLines),
+			totalLines)
+		visibleLines = append(visibleLines, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			Render(footerText))
+	} else {
+		// Just show close instruction if no scrolling needed
+		visibleLines = append(visibleLines, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			Render("ESC or q to close"))
+	}
+
+	// Build final content
+	content := strings.Join(visibleLines, "\n")
+
+	// Apply help box styling with less padding
+	helpStyle := lipgloss.NewStyle().
+		Padding(0, 2).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("214")).
+		Width(viewportWidth).
+		Height(viewportHeight).
+		MarginTop(1) // Add top margin to prevent cutoff
+
+	return helpStyle.Render(content)
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (m model) renderHeader() string {
-	legend := "[ON] Active  [OFF] Inactive"
 	grid := fmt.Sprintf("Grid: %d px", m.GridPx)
 	snapNames := []string{"Off", "Edges", "Centers", "Both"}
 	snap := fmt.Sprintf("Snap: %s", snapNames[m.Snap])
 
 	// Add version if not "dev"
-	header := fmt.Sprintf("Legend: %s   %s   %s", legend, grid, snap)
+	header := fmt.Sprintf("%s   %s", grid, snap)
 	if Version != "dev" {
 		header = fmt.Sprintf("HyprMon %s  |  %s", ShortVersion(), header)
 	}
@@ -182,8 +262,11 @@ func (m model) renderHeader() string {
 }
 
 func (m model) renderDesktop() string {
-	width := m.World.TermW
-	height := m.World.TermH - 8
+	// Content width: terminal width minus border (2) and potential margin (1)
+	width := m.World.TermW - 3
+	// Calculate available height: total - header(2) - details(1) - footer(up to 3) - margins(3)
+	// Be conservative and reserve space for 3-line footer
+	height := m.World.TermH - 10
 
 	// Ensure minimum dimensions
 	if width < 40 {
@@ -193,6 +276,7 @@ func (m model) renderDesktop() string {
 		height = 10
 	}
 
+	// Create the internal content area (this is what goes inside the border)
 	desktop := make([][]rune, height)
 	for i := range desktop {
 		desktop[i] = make([]rune, width)
@@ -215,7 +299,8 @@ func (m model) renderDesktop() string {
 	}
 
 	content := strings.Join(lines, "\n")
-	return desktopStyle.Width(width).Height(height).Render(content)
+	// Don't set explicit width - let lipgloss calculate based on content + border
+	return desktopStyle.Render(content)
 }
 
 func (m model) renderMonitor(desktop [][]rune, mon Monitor, selected bool) {
@@ -367,29 +452,158 @@ func (m model) renderDetails() string {
 	return details
 }
 
+// keyCommand represents a keyboard/mouse command with different verbosity levels
+type keyCommand struct {
+	full     string
+	medium   string
+	short    string
+	priority int // 1 = essential, 2 = important, 3 = nice to have
+}
+
 func (m model) renderFooter() string {
-	keys := []string{
-		"↑↓←→ move",
-		"Shift+↑↓←→ step×10",
-		"Tab select",
-		"Enter toggle",
-		"G grid",
-		"L snap",
-		"R scale",
-		"A apply",
-		"S save",
-		"O profiles",
-		"P save profile",
-		"Z revert",
-		"? help",
-		"Q quit",
+	commands := []keyCommand{
+		{"↑↓←→ move", "↑↓←→ move", "↑↓←→", 1},
+		{"Shift+↑↓←→ step×10", "Shift+↑↓←→ ×10", "S+↑↓←→", 2},
+		{"Tab select", "Tab sel", "Tab", 2},
+		{"Enter toggle", "Enter on/off", "⏎", 2},
+		{"G grid", "G grid", "G", 2},
+		{"L snap", "L snap", "L", 2},
+		{"R scale", "R scale", "R", 1},
+		{"A apply", "A apply", "A", 2},
+		{"S save", "S save", "S", 2},
+		{"O profiles", "O prof", "O", 3},
+		{"P save profile", "P save prof", "P", 3},
+		{"Z revert", "Z undo", "Z", 2},
+		{"? help", "? help", "? Help", 1},
+		{"Q quit", "Q quit", "Q", 1},
 	}
 
-	if m.World.TermW > 100 {
-		keys = append(keys, "Drag to move", "Right-click toggle", "Wheel to scale")
+	// Determine format based on terminal width
+	var keys []string
+	separator := "  •  "
+
+	width := m.World.TermW
+
+	if width < 60 {
+		// Very narrow: only essential commands, shortest form
+		separator = " "
+		for _, cmd := range commands {
+			if cmd.priority == 1 {
+				keys = append(keys, cmd.short)
+			}
+		}
+	} else if width < 80 {
+		// Narrow: essential and important, short form
+		separator = " • "
+		for _, cmd := range commands {
+			if cmd.priority <= 2 {
+				keys = append(keys, cmd.short)
+			}
+		}
+	} else if width < 100 {
+		// Medium: all keyboard commands, medium form
+		separator = " • "
+		for _, cmd := range commands {
+			keys = append(keys, cmd.medium)
+		}
+	} else {
+		// Wide: all keyboard commands, full form
+		for _, cmd := range commands {
+			keys = append(keys, cmd.full)
+		}
 	}
 
-	return footerStyle.Render(strings.Join(keys, "  •  "))
+	// Always try multi-line layout first, up to 3 lines
+	return m.renderMultiLineFooter(commands, width, keys, separator)
+}
+
+func (m model) renderMultiLineFooter(commands []keyCommand, width int, singleLineKeys []string, separator string) string {
+	var lines []string
+	var currentLine []string
+	var currentLength int
+
+	sepLen := len(separator)
+
+	// Helper function to add text to current line or start new line
+	addToLine := func(text string) {
+		textLen := len(text)
+		wouldOverflow := len(currentLine) > 0 && currentLength+sepLen+textLen > width-4
+
+		if wouldOverflow && len(lines) < 3 {
+			// Start new line if we haven't reached 3 lines yet
+			lines = append(lines, strings.Join(currentLine, separator))
+			currentLine = []string{text}
+			currentLength = textLen
+		} else if !wouldOverflow {
+			// Add to current line
+			currentLine = append(currentLine, text)
+			if len(currentLine) > 1 {
+				currentLength += sepLen
+			}
+			currentLength += textLen
+		}
+		// If we would overflow and already have 3 lines, skip this item
+	}
+
+	// First, try with the keys we already have (based on width)
+	for _, key := range singleLineKeys {
+		addToLine(key)
+	}
+
+	// Add remaining line if exists
+	if len(currentLine) > 0 {
+		lines = append(lines, strings.Join(currentLine, separator))
+	}
+
+	// If we're using more than 3 lines, we need to be more selective
+	if len(lines) > 3 {
+		lines = []string{}
+		currentLine = []string{}
+		currentLength = 0
+
+		// Use progressively shorter forms until it fits in 3 lines
+		attempts := []struct {
+			priority int
+			format   string
+		}{
+			{3, "medium"}, // All commands, medium form
+			{3, "short"},  // All commands, short form
+			{2, "short"},  // Important and essential only, short form
+			{1, "short"},  // Essential only, short form
+		}
+
+		for _, attempt := range attempts {
+			lines = []string{}
+			currentLine = []string{}
+			currentLength = 0
+
+			for _, cmd := range commands {
+				if cmd.priority <= attempt.priority {
+					var text string
+					switch attempt.format {
+					case "full":
+						text = cmd.full
+					case "medium":
+						text = cmd.medium
+					case "short":
+						text = cmd.short
+					}
+					addToLine(text)
+				}
+			}
+
+			if len(currentLine) > 0 {
+				lines = append(lines, strings.Join(currentLine, separator))
+			}
+
+			// If it fits in 3 lines, we're done
+			if len(lines) <= 3 {
+				break
+			}
+		}
+	}
+
+	return footerStyle.Render(strings.Join(lines, "\n"))
 }
 
 type boxRunes struct {
