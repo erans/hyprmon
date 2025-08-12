@@ -78,8 +78,6 @@ type initMsg struct {
 	err      error
 }
 
-type pollMsg struct{}
-
 type applyMsg struct {
 	success bool
 	err     error

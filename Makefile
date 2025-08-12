@@ -26,7 +26,7 @@ GOFLAGS := -ldflags="$(LDFLAGS)"
 all: help
 
 # Build the application
-build: fmt-check
+build: fmt-check lint
 	@echo "Building $(BINARY_NAME)..."
 	@mkdir -p $(BIN_DIR)
 	@$(GO) build $(GOFLAGS) -o $(BIN_DIR)/$(BINARY_NAME) .
@@ -91,6 +91,18 @@ vet:
 	@echo "Running go vet..."
 	@$(GO) vet ./...
 
+# Run golangci-lint
+lint:
+	@echo "Running golangci-lint..."
+	@if command -v golangci-lint > /dev/null 2>&1; then \
+		golangci-lint run --timeout=5m; \
+	elif [ -x "$(HOME)/go/bin/golangci-lint" ]; then \
+		$(HOME)/go/bin/golangci-lint run --timeout=5m; \
+	else \
+		echo "⚠ golangci-lint not installed, skipping lint check"; \
+		echo "Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
+	fi
+
 # Download dependencies
 deps:
 	@echo "Downloading dependencies..."
@@ -142,6 +154,7 @@ help:
 	@echo "  test        - Run tests"
 	@echo "  fmt         - Format code"
 	@echo "  vet         - Run go vet"
+	@echo "  lint        - Run golangci-lint"
 	@echo "  deps        - Update dependencies"
 	@echo "  dev         - Build and run with debug info"
 	@echo "  build-all   - Build for multiple platforms"

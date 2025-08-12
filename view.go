@@ -36,9 +36,6 @@ var (
 				BorderForeground(lipgloss.Color("214")).
 				Foreground(lipgloss.Color("214"))
 
-	guideStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("239"))
-
 	desktopStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("240"))

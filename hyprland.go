@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -319,56 +318,4 @@ func rollback() error {
 		return fmt.Errorf("no previous state to rollback to")
 	}
 	return applyMonitors(previousMonitors)
-}
-
-func listModes(name string) ([]Mode, error) {
-	cmd := exec.Command("wlr-randr")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute wlr-randr: %w", err)
-	}
-
-	var modes []Mode
-	lines := strings.Split(string(output), "\n")
-	inMonitor := false
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, name) {
-			inMonitor = true
-			continue
-		}
-		if inMonitor && line != "" && !strings.Contains(line, " ") {
-			inMonitor = false
-			break
-		}
-		if inMonitor && strings.Contains(line, "x") && strings.Contains(line, "@") {
-			if mode := parseWlrMode(line); mode != nil {
-				modes = append(modes, *mode)
-			}
-		}
-	}
-
-	return modes, nil
-}
-
-func readConfigLines() ([]string, error) {
-	configPath := getConfigPath()
-	if configPath == "" {
-		return nil, fmt.Errorf("could not determine config path")
-	}
-
-	file, err := os.Open(configPath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var lines []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
-
-	return lines, scanner.Err()
 }

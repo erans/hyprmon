@@ -134,27 +134,16 @@ func (m model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	m.MouseX = msg.X
 	m.MouseY = msg.Y
 
-	switch msg.Type {
-	case tea.MouseLeft:
-		if msg.Action == tea.MouseActionPress {
+	switch msg.Action {
+	case tea.MouseActionPress:
+		switch msg.Button {
+		case tea.MouseButtonLeft:
 			hit := m.hitTest(msg.X, msg.Y-2)
 			if hit >= 0 {
 				m.Selected = hit
 				m.beginDrag(msg)
 			}
-		} else if msg.Action == tea.MouseActionRelease {
-			if m.Selected >= 0 && m.Selected < len(m.Monitors) {
-				m.endDrag()
-			}
-		}
-
-	case tea.MouseMotion:
-		if msg.Action == tea.MouseActionMotion {
-			m.dragMove(msg)
-		}
-
-	case tea.MouseRight:
-		if msg.Action == tea.MouseActionPress {
+		case tea.MouseButtonRight:
 			hit := m.hitTest(msg.X, msg.Y-2)
 			if hit >= 0 {
 				m.Monitors[hit].Active = !m.Monitors[hit].Active
@@ -162,23 +151,29 @@ func (m model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					m.Monitors[hit].Name,
 					map[bool]string{true: "Active", false: "Inactive"}[m.Monitors[hit].Active])
 			}
+		case tea.MouseButtonWheelUp:
+			if m.Selected >= 0 && m.Selected < len(m.Monitors) {
+				mon := &m.Monitors[m.Selected]
+				delta := float32(0.05)
+				mon.Scale = clamp(mon.Scale+delta, 0.5, 3.0)
+				m.Status = fmt.Sprintf("Scale: %.2f", mon.Scale)
+			}
+		case tea.MouseButtonWheelDown:
+			if m.Selected >= 0 && m.Selected < len(m.Monitors) {
+				mon := &m.Monitors[m.Selected]
+				delta := float32(0.05)
+				mon.Scale = clamp(mon.Scale-delta, 0.5, 3.0)
+				m.Status = fmt.Sprintf("Scale: %.2f", mon.Scale)
+			}
 		}
-
-	case tea.MouseWheelUp:
-		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
-			mon := &m.Monitors[m.Selected]
-			delta := float32(0.05)
-			mon.Scale = clamp(mon.Scale+delta, 0.5, 3.0)
-			m.Status = fmt.Sprintf("Scale: %.2f", mon.Scale)
+	case tea.MouseActionRelease:
+		if msg.Button == tea.MouseButtonLeft {
+			if m.Selected >= 0 && m.Selected < len(m.Monitors) {
+				m.endDrag()
+			}
 		}
-
-	case tea.MouseWheelDown:
-		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
-			mon := &m.Monitors[m.Selected]
-			delta := float32(0.05)
-			mon.Scale = clamp(mon.Scale-delta, 0.5, 3.0)
-			m.Status = fmt.Sprintf("Scale: %.2f", mon.Scale)
-		}
+	case tea.MouseActionMotion:
+		m.dragMove(msg)
 	}
 
 	return m, nil
