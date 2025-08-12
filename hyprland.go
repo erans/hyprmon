@@ -13,31 +13,31 @@ import (
 )
 
 type hyprMonitor struct {
-	ID               int     `json:"id"`
-	Name             string  `json:"name"`
-	Description      string  `json:"description"`
-	Make             string  `json:"make"`
-	Model            string  `json:"model"`
-	Serial           string  `json:"serial"`
-	Width            int     `json:"width"`
-	Height           int     `json:"height"`
-	RefreshRate      float64 `json:"refreshRate"`
-	X                int     `json:"x"`
-	Y                int     `json:"y"`
-	ActiveWorkspace  struct {
+	ID              int     `json:"id"`
+	Name            string  `json:"name"`
+	Description     string  `json:"description"`
+	Make            string  `json:"make"`
+	Model           string  `json:"model"`
+	Serial          string  `json:"serial"`
+	Width           int     `json:"width"`
+	Height          int     `json:"height"`
+	RefreshRate     float64 `json:"refreshRate"`
+	X               int     `json:"x"`
+	Y               int     `json:"y"`
+	ActiveWorkspace struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
 	} `json:"activeWorkspace"`
-	Reserved         []int   `json:"reserved"`
-	Scale            float64 `json:"scale"`
-	Transform        int     `json:"transform"`
-	Focused          bool    `json:"focused"`
-	DpmsStatus       bool    `json:"dpmsStatus"`
-	VRR              bool    `json:"vrr"`
-	ActivelyTearing  bool    `json:"activelyTearing"`
-	Disabled         bool    `json:"disabled"`
-	CurrentFormat    string  `json:"currentFormat"`
-	AvailableModes   []string `json:"availableModes"`
+	Reserved        []int    `json:"reserved"`
+	Scale           float64  `json:"scale"`
+	Transform       int      `json:"transform"`
+	Focused         bool     `json:"focused"`
+	DpmsStatus      bool     `json:"dpmsStatus"`
+	VRR             bool     `json:"vrr"`
+	ActivelyTearing bool     `json:"activelyTearing"`
+	Disabled        bool     `json:"disabled"`
+	CurrentFormat   string   `json:"currentFormat"`
+	AvailableModes  []string `json:"availableModes"`
 }
 
 func readMonitors() ([]Monitor, error) {
@@ -216,12 +216,12 @@ func getConfigPath() string {
 	if envPath := os.Getenv("HYPRLAND_CONFIG"); envPath != "" {
 		return envPath
 	}
-	
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
-	
+
 	return filepath.Join(home, ".config", "hypr", "hyprland.conf")
 }
 
@@ -232,7 +232,7 @@ func writeConfig(monitors []Monitor) error {
 	}
 
 	backupPath := fmt.Sprintf("%s.bak.%d", configPath, time.Now().Unix())
-	
+
 	input, err := os.ReadFile(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to read config: %w", err)
@@ -249,7 +249,7 @@ func writeConfig(monitors []Monitor) error {
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		
+
 		if strings.HasPrefix(trimmed, "monitor=") || strings.HasPrefix(trimmed, "monitor ") {
 			if !monitorLinesWritten {
 				for _, m := range monitors {
@@ -267,11 +267,11 @@ func writeConfig(monitors []Monitor) error {
 			inMonitorSection = true
 			continue
 		}
-		
+
 		if inMonitorSection && trimmed != "" && !strings.HasPrefix(trimmed, "monitor") {
 			inMonitorSection = false
 		}
-		
+
 		if !inMonitorSection || trimmed == "" {
 			newLines = append(newLines, line)
 		}

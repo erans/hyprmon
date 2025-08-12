@@ -37,13 +37,13 @@ const (
 )
 
 type world struct {
-	Width     int32
-	Height    int32
-	TermW     int
-	TermH     int
-	Scale     float32
-	OffsetX   int32
-	OffsetY   int32
+	Width   int32
+	Height  int32
+	TermW   int
+	TermH   int
+	Scale   float32
+	OffsetX int32
+	OffsetY int32
 }
 
 type guide struct {
@@ -65,12 +65,12 @@ type model struct {
 	MouseY      int
 	LastMouseX  int
 	LastMouseY  int
-	
+
 	// Sub-views
-	ShowScalePicker bool
-	ScalePicker     scalePickerModel
+	ShowScalePicker  bool
+	ScalePicker      scalePickerModel
 	ShowProfileInput bool
-	ProfileInput    profileInputModel
+	ProfileInput     profileInputModel
 }
 
 type initMsg struct {
@@ -149,7 +149,7 @@ func (m *model) beginDrag(msg tea.MouseMsg) {
 	if m.Selected < 0 || m.Selected >= len(m.Monitors) {
 		return
 	}
-	
+
 	mon := &m.Monitors[m.Selected]
 	wx, wy := m.termToWorld(msg.X, msg.Y)
 	mon.Dragging = true
@@ -161,25 +161,25 @@ func (m *model) dragMove(msg tea.MouseMsg) {
 	if m.Selected < 0 || m.Selected >= len(m.Monitors) {
 		return
 	}
-	
+
 	mon := &m.Monitors[m.Selected]
 	if !mon.Dragging {
 		return
 	}
-	
+
 	wx, wy := m.termToWorld(msg.X, msg.Y)
 	newX := wx - mon.DragOffX
 	newY := wy - mon.DragOffY
-	
+
 	if m.GridPx > 1 {
 		newX = (newX / int32(m.GridPx)) * int32(m.GridPx)
 		newY = (newY / int32(m.GridPx)) * int32(m.GridPx)
 	}
-	
+
 	if m.Snap != SnapOff {
 		newX, newY, m.Guides = m.snapPosition(mon, newX, newY)
 	}
-	
+
 	mon.X = newX
 	mon.Y = newY
 }
@@ -188,7 +188,7 @@ func (m *model) endDrag() {
 	if m.Selected < 0 || m.Selected >= len(m.Monitors) {
 		return
 	}
-	
+
 	mon := &m.Monitors[m.Selected]
 	mon.Dragging = false
 	m.Guides = nil
@@ -198,12 +198,12 @@ func (m *model) snapPosition(mon *Monitor, x, y int32) (int32, int32, []guide) {
 	guides := []guide{}
 	newX, newY := x, y
 	thresh := int32(m.SnapThresh)
-	
+
 	for i, other := range m.Monitors {
 		if i == m.Selected || !other.Active {
 			continue
 		}
-		
+
 		if m.Snap == SnapEdges || m.Snap == SnapBoth {
 			if abs(x-other.X-int32(other.PxW)) < thresh {
 				newX = other.X + int32(other.PxW)
@@ -215,7 +215,7 @@ func (m *model) snapPosition(mon *Monitor, x, y int32) (int32, int32, []guide) {
 				newX = other.X
 				guides = append(guides, guide{Type: "vertical", Value: newX})
 			}
-			
+
 			if abs(y-other.Y-int32(other.PxH)) < thresh {
 				newY = other.Y + int32(other.PxH)
 				guides = append(guides, guide{Type: "horizontal", Value: newY})
@@ -227,25 +227,25 @@ func (m *model) snapPosition(mon *Monitor, x, y int32) (int32, int32, []guide) {
 				guides = append(guides, guide{Type: "horizontal", Value: newY})
 			}
 		}
-		
+
 		if m.Snap == SnapCenters || m.Snap == SnapBoth {
 			monCenterX := x + int32(mon.PxW)/2
 			monCenterY := y + int32(mon.PxH)/2
 			otherCenterX := other.X + int32(other.PxW)/2
 			otherCenterY := other.Y + int32(other.PxH)/2
-			
+
 			if abs(monCenterX-otherCenterX) < thresh {
 				newX = otherCenterX - int32(mon.PxW)/2
 				guides = append(guides, guide{Type: "vertical", Value: otherCenterX})
 			}
-			
+
 			if abs(monCenterY-otherCenterY) < thresh {
 				newY = otherCenterY - int32(mon.PxH)/2
 				guides = append(guides, guide{Type: "horizontal", Value: otherCenterY})
 			}
 		}
 	}
-	
+
 	if abs(x) < thresh {
 		newX = 0
 		guides = append(guides, guide{Type: "vertical", Value: 0})
@@ -254,7 +254,7 @@ func (m *model) snapPosition(mon *Monitor, x, y int32) (int32, int32, []guide) {
 		newY = 0
 		guides = append(guides, guide{Type: "horizontal", Value: 0})
 	}
-	
+
 	return newX, newY, guides
 }
 

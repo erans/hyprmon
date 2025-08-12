@@ -26,7 +26,7 @@ GOFLAGS := -ldflags="$(LDFLAGS)"
 all: help
 
 # Build the application
-build:
+build: fmt-check
 	@echo "Building $(BINARY_NAME)..."
 	@mkdir -p $(BIN_DIR)
 	@$(GO) build $(GOFLAGS) -o $(BIN_DIR)/$(BINARY_NAME) .
@@ -72,6 +72,20 @@ fmt:
 	@$(GO) fmt ./...
 	@echo "Formatting complete"
 
+# Check if code is formatted
+fmt-check:
+	@echo "Checking code formatting..."
+	@fmt_output=$$($(GO) fmt ./... 2>&1); \
+	if [ -n "$$fmt_output" ]; then \
+		echo "❌ The following files need formatting:"; \
+		echo "$$fmt_output"; \
+		echo ""; \
+		echo "Run 'make fmt' to fix formatting issues"; \
+		exit 1; \
+	else \
+		echo "✓ Code formatting is correct"; \
+	fi
+
 # Check for issues
 vet:
 	@echo "Running go vet..."
@@ -106,6 +120,11 @@ version:
 	@echo "Build Date: $(BUILD_DATE)"
 	@echo "Go Version: $(GO_VERSION)"
 
+# Install git hooks
+hooks:
+	@echo "Installing git hooks..."
+	@./scripts/install-hooks.sh
+
 # Show help
 help:
 	@echo "HyprMon Makefile"
@@ -127,6 +146,7 @@ help:
 	@echo "  dev         - Build and run with debug info"
 	@echo "  build-all   - Build for multiple platforms"
 	@echo "  version     - Show version information"
+	@echo "  hooks       - Install git pre-commit hooks"
 	@echo "  help        - Show this help message"
 	@echo ""
 	@echo "Examples:"

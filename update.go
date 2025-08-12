@@ -27,19 +27,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.ShowProfileInput = false
 			return m, nil
-			
+
 		case profileInputCancelMsg:
 			m.ShowProfileInput = false
 			m.Status = "Profile save cancelled"
 			return m, nil
-			
+
 		case tea.KeyMsg:
 			if msg.String() == "ctrl+c" {
 				// Allow force quitting from profile input
 				return m, tea.Quit
 			}
 		}
-		
+
 		// Pass other messages to profile input
 		newInput, cmd := m.ProfileInput.Update(msg)
 		m.ProfileInput = newInput.(profileInputModel)
@@ -56,19 +56,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.ShowScalePicker = false
 			return m, nil
-			
+
 		case scaleCancelledMsg:
 			m.ShowScalePicker = false
 			m.Status = "Scale selection cancelled"
 			return m, nil
-			
+
 		case tea.KeyMsg:
 			if msg.String() == "q" || msg.String() == "ctrl+c" {
 				// Allow quitting from scale picker
 				return m, tea.Quit
 			}
 		}
-		
+
 		// Pass other messages to scale picker
 		newPicker, cmd := m.ScalePicker.Update(msg)
 		m.ScalePicker = newPicker.(scalePickerModel)
@@ -158,7 +158,7 @@ func (m model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			hit := m.hitTest(msg.X, msg.Y-2)
 			if hit >= 0 {
 				m.Monitors[hit].Active = !m.Monitors[hit].Active
-				m.Status = fmt.Sprintf("Monitor %s: %s", 
+				m.Status = fmt.Sprintf("Monitor %s: %s",
 					m.Monitors[hit].Name,
 					map[bool]string{true: "Active", false: "Inactive"}[m.Monitors[hit].Active])
 			}

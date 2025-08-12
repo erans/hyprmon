@@ -7,9 +7,9 @@ import (
 
 // Build variables - these are set via ldflags during build
 var (
-	Version   = "dev"       // Semantic version
-	GitCommit = "unknown"   // Git commit hash
-	BuildDate = "unknown"   // Build timestamp
+	Version   = "dev"     // Semantic version
+	GitCommit = "unknown" // Git commit hash
+	BuildDate = "unknown" // Build timestamp
 	GoVersion = runtime.Version()
 )
 

@@ -9,39 +9,39 @@ import (
 
 var (
 	headerStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("12")).
-		MarginBottom(1)
+			Bold(true).
+			Foreground(lipgloss.Color("12")).
+			MarginBottom(1)
 
 	footerStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("241")).
-		MarginTop(1)
+			Foreground(lipgloss.Color("241")).
+			MarginTop(1)
 
 	statusStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("214")).
-		Bold(true)
+			Foreground(lipgloss.Color("214")).
+			Bold(true)
 
 	monitorBoxActive = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("42")).
-		Foreground(lipgloss.Color("42"))
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("42")).
+				Foreground(lipgloss.Color("42"))
 
 	monitorBoxInactive = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("244")).
-		Foreground(lipgloss.Color("244"))
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("244")).
+				Foreground(lipgloss.Color("244"))
 
 	monitorBoxSelected = lipgloss.NewStyle().
-		Border(lipgloss.DoubleBorder()).
-		BorderForeground(lipgloss.Color("214")).
-		Foreground(lipgloss.Color("214"))
+				Border(lipgloss.DoubleBorder()).
+				BorderForeground(lipgloss.Color("214")).
+				Foreground(lipgloss.Color("214"))
 
 	guideStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("239"))
+			Foreground(lipgloss.Color("239"))
 
 	desktopStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("240"))
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("240"))
 )
 
 func (m model) View() string {
@@ -86,20 +86,20 @@ func (m model) renderHeader() string {
 	grid := fmt.Sprintf("Grid: %d px", m.GridPx)
 	snapNames := []string{"Off", "Edges", "Centers", "Both"}
 	snap := fmt.Sprintf("Snap: %s", snapNames[m.Snap])
-	
+
 	// Add version if not "dev"
 	header := fmt.Sprintf("Legend: %s   %s   %s", legend, grid, snap)
 	if Version != "dev" {
 		header = fmt.Sprintf("HyprMon %s  |  %s", ShortVersion(), header)
 	}
-	
+
 	return headerStyle.Render(header)
 }
 
 func (m model) renderDesktop() string {
 	width := m.World.TermW
 	height := m.World.TermH - 8
-	
+
 	// Ensure minimum dimensions
 	if width < 40 {
 		width = 40
@@ -299,7 +299,7 @@ type boxRunes struct {
 
 func (m model) getBoxRunes(style lipgloss.Style) boxRunes {
 	borderStyle := style.GetBorderStyle()
-	
+
 	return boxRunes{
 		topLeft:     []rune(borderStyle.TopLeft)[0],
 		topRight:    []rune(borderStyle.TopRight)[0],

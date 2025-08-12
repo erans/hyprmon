@@ -13,7 +13,7 @@ func main() {
 	var profileName string
 	var listProfiles bool
 	var showVersion bool
-	
+
 	flag.StringVar(&profileName, "profile", "", "Apply a specific profile")
 	flag.BoolVar(&listProfiles, "profiles", false, "Show profile selection menu")
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
@@ -45,7 +45,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error loading profiles: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 		p := tea.NewProgram(m, tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
 			log.Fatal(err)

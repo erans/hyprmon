@@ -9,11 +9,11 @@ import (
 )
 
 type profileInputModel struct {
-	input         string
-	cursor        int
+	input           string
+	cursor          int
 	confirmOverride bool
-	existingName  string
-	error         string
+	existingName    string
+	error           string
 }
 
 func newProfileInput() profileInputModel {
@@ -61,13 +61,13 @@ func (m profileInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.error = "Profile name cannot be empty"
 				return m, nil
 			}
-			
+
 			// Sanitize the name
 			name := strings.TrimSpace(m.input)
 			name = strings.ReplaceAll(name, "/", "-")
 			name = strings.ReplaceAll(name, "\\", "-")
 			name = strings.ReplaceAll(name, "..", "")
-			
+
 			if name == "" {
 				m.error = "Invalid profile name"
 				return m, nil
@@ -149,14 +149,14 @@ func (m profileInputModel) View() string {
 	if m.confirmOverride {
 		s.WriteString(titleStyle.Render("Profile Already Exists"))
 		s.WriteString("\n\n")
-		
+
 		warningStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("214"))
-		
+
 		s.WriteString(warningStyle.Render(fmt.Sprintf("Profile '%s' already exists.", m.existingName)))
 		s.WriteString("\n")
 		s.WriteString("Do you want to override it? (y/n)")
-		
+
 		return s.String()
 	}
 
@@ -200,11 +200,11 @@ func (m profileInputModel) View() string {
 	if len(existingProfiles) > 0 {
 		s.WriteString(labelStyle.Render("Existing profiles:"))
 		s.WriteString("\n")
-		
+
 		listStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("243")).
 			PaddingLeft(2)
-		
+
 		for _, profile := range existingProfiles {
 			s.WriteString(listStyle.Render("• " + profile))
 			s.WriteString("\n")
@@ -224,7 +224,7 @@ func (m profileInputModel) View() string {
 	suggestionStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("243")).
 		Italic(true)
-	
+
 	s.WriteString(suggestionStyle.Render("Suggestions: home, work, laptop, presentation, gaming"))
 
 	return s.String()

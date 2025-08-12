@@ -133,7 +133,7 @@ func (m scalePickerModel) View() string {
 
 	for i, scale := range m.scales {
 		scaleStr := fmt.Sprintf("%.2fx", scale)
-		
+
 		// Add indicators for special scales
 		indicator := ""
 		if scale == 1.00 {
@@ -141,11 +141,11 @@ func (m scalePickerModel) View() string {
 		} else if scale == m.current {
 			indicator = currentStyle.Render(" (current)")
 		}
-		
+
 		// Add DPI information
 		dpi := int(96 * scale)
 		dpiInfo := fmt.Sprintf(" - %d DPI", dpi)
-		
+
 		// Add recommendations
 		recommendation := ""
 		if scale == 1.00 {
@@ -181,9 +181,9 @@ func (m scalePickerModel) View() string {
 	previewStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("245")).
 		Italic(true)
-	
+
 	selectedScale := m.scales[m.selected]
-	effectiveRes := fmt.Sprintf("Physical: %dx%d → Effective: %dx%d", 
+	effectiveRes := fmt.Sprintf("Physical: %dx%d → Effective: %dx%d",
 		m.width, m.height,
 		int(float32(m.width)/selectedScale), int(float32(m.height)/selectedScale))
 	s.WriteString(previewStyle.Render(effectiveRes))

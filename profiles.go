@@ -48,7 +48,7 @@ func saveProfile(name string, monitors []Monitor) error {
 	}
 
 	filename := filepath.Join(getProfilesDir(), fmt.Sprintf("%s.json", name))
-	
+
 	if _, err := os.Stat(filename); err == nil {
 		existingProfile, err := loadProfile(name)
 		if err == nil {
@@ -66,7 +66,7 @@ func saveProfile(name string, monitors []Monitor) error {
 
 func loadProfile(name string) (*Profile, error) {
 	filename := filepath.Join(getProfilesDir(), fmt.Sprintf("%s.json", name))
-	
+
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
@@ -117,7 +117,7 @@ func applyProfile(name string) error {
 	}
 
 	saveRollback(profile.Monitors)
-	
+
 	if err := applyMonitors(profile.Monitors); err != nil {
 		return fmt.Errorf("failed to apply profile: %w", err)
 	}
@@ -140,7 +140,7 @@ func initialProfileMenu() (profileMenuModel, error) {
 	// Add options at the end
 	profiles = append(profiles, "──────────────────")
 	profiles = append(profiles, "[ Open Full UI ]")
-	
+
 	return profileMenuModel{
 		profiles: profiles,
 		selected: 0,
@@ -157,7 +157,7 @@ func (m profileMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c", "esc":
 			return m, tea.Quit
-			
+
 		case "up", "k":
 			if m.selected > 0 {
 				m.selected--
@@ -166,7 +166,7 @@ func (m profileMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.selected--
 				}
 			}
-			
+
 		case "down", "j":
 			if m.selected < len(m.profiles)-1 {
 				m.selected++
@@ -175,10 +175,10 @@ func (m profileMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.selected++
 				}
 			}
-			
+
 		case "enter":
 			selectedProfile := m.profiles[m.selected]
-			
+
 			if selectedProfile == "[ Open Full UI ]" {
 				fmt.Println("Launching full UI...")
 				return m, tea.Quit
@@ -194,7 +194,7 @@ func (m profileMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				fmt.Printf("Applied profile: %s\n", selectedProfile)
 				return m, tea.Quit
 			}
-			
+
 		case "d":
 			// Don't allow deleting the separator or UI option
 			if m.selected < len(m.profiles)-2 && !strings.HasPrefix(m.profiles[m.selected], "─") {
@@ -213,36 +213,36 @@ func (m profileMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-	
+
 	return m, nil
 }
 
 func (m profileMenuModel) View() string {
 	var s strings.Builder
-	
+
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("12")).
 		MarginBottom(1)
-		
+
 	s.WriteString(titleStyle.Render("HyprMon - Profile Selection"))
 	s.WriteString("\n\n")
-	
+
 	if m.err != nil {
 		errStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("9"))
 		s.WriteString(errStyle.Render(fmt.Sprintf("Error: %v", m.err)))
 		s.WriteString("\n\n")
 	}
-	
+
 	itemStyle := lipgloss.NewStyle().
 		PaddingLeft(2)
-		
+
 	selectedStyle := lipgloss.NewStyle().
 		PaddingLeft(1).
 		Foreground(lipgloss.Color("214")).
 		Bold(true)
-	
+
 	for i, profile := range m.profiles {
 		if strings.HasPrefix(profile, "─") {
 			// Render separator
@@ -256,14 +256,14 @@ func (m profileMenuModel) View() string {
 		}
 		s.WriteString("\n")
 	}
-	
+
 	s.WriteString("\n")
-	
+
 	helpStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("241"))
-		
+
 	help := "↑/↓: Navigate  •  Enter: Select  •  D: Delete  •  Q: Quit"
 	s.WriteString(helpStyle.Render(help))
-	
+
 	return s.String()
 }

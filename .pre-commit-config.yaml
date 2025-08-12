@@ -1,0 +1,74 @@
+# Pre-commit configuration for HyprMon
+# Install: pip install pre-commit
+# Setup: pre-commit install
+# Manual run: pre-commit run --all-files
+
+repos:
+  # Go formatting
+  - repo: local
+    hooks:
+      - id: go-fmt
+        name: Go Format
+        entry: bash -c 'make fmt-check'
+        language: system
+        files: '\.go$'
+        pass_filenames: false
+
+  # Go imports
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.54.2
+    hooks:
+      - id: golangci-lint-mod
+      - id: golangci-lint
+
+  # Go tests
+  - repo: local
+    hooks:
+      - id: go-test
+        name: Go Test
+        entry: go test -short ./...
+        language: system
+        files: '\.go$'
+        pass_filenames: false
+
+  # Go vet
+  - repo: local
+    hooks:
+      - id: go-vet
+        name: Go Vet
+        entry: go vet ./...
+        language: system
+        files: '\.go$'
+        pass_filenames: false
+
+  # Check for large files
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+
+  # License check
+  - repo: local
+    hooks:
+      - id: license-check
+        name: License Check
+        entry: bash -c 'test -f LICENSE || (echo "LICENSE file missing" && exit 1)'
+        language: system
+        pass_filenames: false
+
+  # Prevent committing binary
+  - repo: local
+    hooks:
+      - id: no-binary
+        name: No Binary Files
+        entry: bash -c 'test ! -f bin/hyprmon || (echo "Remove binary from bin/ before committing" && exit 1)'
+        language: system
+        pass_filenames: false
