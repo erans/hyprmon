@@ -179,6 +179,23 @@ Apache License 2.0 - See [LICENSE](LICENSE) file for details
 
 Copyright 2025 Eran Sandler
 
+## Development
+
+### Setting up development environment
+```bash
+git clone https://github.com/eransandler/hyprmon.git
+cd hyprmon
+make deps        # Install dependencies
+make hooks       # Install git pre-commit hooks
+make build       # Build the application
+```
+
+### CI/CD Workflows
+
+- **CI**: Runs on every push to main - tests, linting, build verification
+- **Release**: Only runs on version tags (v*) - builds binaries and creates GitHub release
+- **PR Checks**: Runs on pull requests - comprehensive testing and security scanning
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit pull requests or open issues for bugs and feature requests.
