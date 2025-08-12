@@ -300,7 +300,7 @@ func (m profileMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 								break
 							}
 						}
-						saveProfileOrder(m.profileOrder)
+						_ = saveProfileOrder(m.profileOrder)
 
 						// Rebuild profiles list maintaining order
 						profiles := make([]string, len(m.profileOrder))
@@ -380,7 +380,7 @@ func (m profileMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					}
 					m.profileOrder = newOrder
-					saveProfileOrder(m.profileOrder)
+					_ = saveProfileOrder(m.profileOrder)
 
 					// Rebuild profiles list maintaining order
 					profiles := make([]string, len(m.profileOrder))
