@@ -26,6 +26,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+        cache-dependency-path: go.sum
 
     - name: Get dependencies
       run: |
@@ -74,6 +75,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+        cache-dependency-path: go.sum
 
     - name: Test Build
       env:
@@ -107,6 +109,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+        cache-dependency-path: go.sum
 
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v3
