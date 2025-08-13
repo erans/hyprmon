@@ -74,6 +74,9 @@ type model struct {
 	ShowHelp         bool
 	HelpScrollOffset int  // Scroll position for help screen
 	OpenProfiles     bool // Flag to open profiles page
+
+	// Monitor tracking for workspace migration
+	PreviousMonitorNames []string
 }
 
 type initMsg struct {

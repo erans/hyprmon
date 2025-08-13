@@ -161,6 +161,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.Status = fmt.Sprintf("Loaded %d monitors", len(m.Monitors))
 			m.updateWorld()
+
+			// Store current monitor names for tracking
+			var names []string
+			for _, mon := range m.Monitors {
+				if mon.Active {
+					names = append(names, mon.Name)
+				}
+			}
+			m.PreviousMonitorNames = names
 		}
 		// Force a window size refresh after initial load
 		return m, tea.WindowSize()
@@ -450,8 +459,25 @@ func reloadMonitorsCmd() tea.Cmd {
 
 func applyCmd(monitors []Monitor) tea.Cmd {
 	return func() tea.Msg {
+		// Get current monitor names before applying changes
+		previousNames, _ := getCurrentMonitorNames()
+
+		// Apply the monitor configuration
 		err := applyMonitors(monitors)
-		return applyMsg{success: err == nil, err: err}
+		if err != nil {
+			return applyMsg{success: false, err: err}
+		}
+
+		// Get monitor names after applying changes
+		currentNames, _ := getCurrentMonitorNames()
+
+		// Migrate orphaned workspaces if monitors were removed
+		if err := migrateOrphanedWorkspaces(previousNames, currentNames); err != nil {
+			// Log the error but don't fail the apply operation
+			fmt.Printf("Warning: Failed to migrate workspaces: %v\n", err)
+		}
+
+		return applyMsg{success: true, err: nil}
 	}
 }
 

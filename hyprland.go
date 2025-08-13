@@ -39,6 +39,15 @@ type hyprMonitor struct {
 	AvailableModes  []string `json:"availableModes"`
 }
 
+type hyprWorkspace struct {
+	ID         int    `json:"id"`
+	Name       string `json:"name"`
+	Monitor    string `json:"monitor"`
+	MonitorID  int    `json:"monitorID"`
+	Windows    int    `json:"windows"`
+	Persistent bool   `json:"ispersistent"`
+}
+
 func readMonitors() ([]Monitor, error) {
 	cmd := exec.Command("hyprctl", "monitors", "all", "-j")
 	output, err := cmd.Output()
@@ -240,4 +249,80 @@ func rollback() error {
 		return fmt.Errorf("no previous state to rollback to")
 	}
 	return applyMonitors(previousMonitors)
+}
+
+func readWorkspaces() ([]hyprWorkspace, error) {
+	cmd := exec.Command("hyprctl", "workspaces", "-j")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute hyprctl workspaces: %w", err)
+	}
+
+	var workspaces []hyprWorkspace
+	if err := json.Unmarshal(output, &workspaces); err != nil {
+		return nil, fmt.Errorf("failed to parse workspaces JSON: %w", err)
+	}
+
+	return workspaces, nil
+}
+
+func getCurrentMonitorNames() ([]string, error) {
+	cmd := exec.Command("hyprctl", "monitors", "-j")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute hyprctl monitors: %w", err)
+	}
+
+	var hyprMonitors []hyprMonitor
+	if err := json.Unmarshal(output, &hyprMonitors); err != nil {
+		return nil, fmt.Errorf("failed to parse monitors JSON: %w", err)
+	}
+
+	var names []string
+	for _, m := range hyprMonitors {
+		if !m.Disabled {
+			names = append(names, m.Name)
+		}
+	}
+	return names, nil
+}
+
+func migrateOrphanedWorkspaces(previousMonitorNames, currentMonitorNames []string) error {
+	removedMonitors := findRemovedMonitors(previousMonitorNames, currentMonitorNames)
+	if len(removedMonitors) == 0 {
+		return nil
+	}
+
+	workspaces, err := readWorkspaces()
+	if err != nil {
+		return fmt.Errorf("failed to read workspaces: %w", err)
+	}
+
+	for _, workspace := range workspaces {
+		for _, removedMonitor := range removedMonitors {
+			if workspace.Monitor == removedMonitor {
+				cmd := fmt.Sprintf("hyprctl dispatch moveworkspacetomonitor %d current", workspace.ID)
+				if err := exec.Command("sh", "-c", cmd).Run(); err != nil {
+					return fmt.Errorf("failed to migrate workspace %d: %w", workspace.ID, err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func findRemovedMonitors(previous, current []string) []string {
+	currentSet := make(map[string]bool)
+	for _, name := range current {
+		currentSet[name] = true
+	}
+
+	var removed []string
+	for _, name := range previous {
+		if !currentSet[name] {
+			removed = append(removed, name)
+		}
+	}
+	return removed
 }
