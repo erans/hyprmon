@@ -16,7 +16,7 @@ repos:
 
   # Go linting with golangci-lint
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.61.0
+    rev: v2.4.0
     hooks:
       - id: golangci-lint
         args: ['--timeout=5m']

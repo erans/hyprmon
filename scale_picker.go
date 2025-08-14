@@ -136,10 +136,13 @@ func (m scalePickerModel) View() string {
 
 		// Add indicators for special scales
 		indicator := ""
-		if scale == 1.00 {
+		switch scale {
+		case 1.00:
 			indicator = " (native)"
-		} else if scale == m.current {
-			indicator = currentStyle.Render(" (current)")
+		default:
+			if scale == m.current {
+				indicator = currentStyle.Render(" (current)")
+			}
 		}
 
 		// Add DPI information
@@ -148,13 +151,14 @@ func (m scalePickerModel) View() string {
 
 		// Add recommendations
 		recommendation := ""
-		if scale == 1.00 {
+		switch scale {
+		case 1.00:
 			recommendation = recommendedStyle.Render(" - No scaling")
-		} else if scale == 1.25 {
+		case 1.25:
 			recommendation = recommendedStyle.Render(" - Good for 27\" 4K")
-		} else if scale == 1.50 {
+		case 1.50:
 			recommendation = recommendedStyle.Render(" - Good for 24\" 4K")
-		} else if scale == 2.00 {
+		case 2.00:
 			recommendation = recommendedStyle.Render(" - HiDPI/Retina")
 		}
 
