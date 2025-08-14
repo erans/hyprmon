@@ -111,11 +111,15 @@ func (m *model) updateWorld() {
 
 	var maxX, maxY int32
 	for _, mon := range m.Monitors {
-		if mon.X+int32(mon.PxW) > maxX {
-			maxX = mon.X + int32(mon.PxW)
+		// Use scaled dimensions for world bounds
+		scaledWidth := int32(float32(mon.PxW) / mon.Scale)
+		scaledHeight := int32(float32(mon.PxH) / mon.Scale)
+
+		if mon.X+scaledWidth > maxX {
+			maxX = mon.X + scaledWidth
 		}
-		if mon.Y+int32(mon.PxH) > maxY {
-			maxY = mon.Y + int32(mon.PxH)
+		if mon.Y+scaledHeight > maxY {
+			maxY = mon.Y + scaledHeight
 		}
 	}
 
@@ -149,8 +153,12 @@ func (m *model) termToWorld(x, y int) (int32, int32) {
 func (m *model) hitTest(x, y int) int {
 	wx, wy := m.termToWorld(x, y)
 	for i, mon := range m.Monitors {
-		if wx >= mon.X && wx < mon.X+int32(mon.PxW) &&
-			wy >= mon.Y && wy < mon.Y+int32(mon.PxH) {
+		// Use scaled dimensions for hit testing
+		scaledWidth := int32(float32(mon.PxW) / mon.Scale)
+		scaledHeight := int32(float32(mon.PxH) / mon.Scale)
+
+		if wx >= mon.X && wx < mon.X+scaledWidth &&
+			wy >= mon.Y && wy < mon.Y+scaledHeight {
 			return i
 		}
 	}
@@ -217,22 +225,28 @@ func (m *model) snapPosition(mon *Monitor, x, y int32) (int32, int32, []guide) {
 		}
 
 		if m.Snap == SnapEdges || m.Snap == SnapBoth {
-			if abs(x-other.X-int32(other.PxW)) < thresh {
-				newX = other.X + int32(other.PxW)
+			// Use scaled dimensions for snapping
+			monScaledWidth := int32(float32(mon.PxW) / mon.Scale)
+			monScaledHeight := int32(float32(mon.PxH) / mon.Scale)
+			otherScaledWidth := int32(float32(other.PxW) / other.Scale)
+			otherScaledHeight := int32(float32(other.PxH) / other.Scale)
+
+			if abs(x-other.X-otherScaledWidth) < thresh {
+				newX = other.X + otherScaledWidth
 				guides = append(guides, guide{Type: "vertical", Value: newX})
-			} else if abs(x+int32(mon.PxW)-other.X) < thresh {
-				newX = other.X - int32(mon.PxW)
+			} else if abs(x+monScaledWidth-other.X) < thresh {
+				newX = other.X - monScaledWidth
 				guides = append(guides, guide{Type: "vertical", Value: other.X})
 			} else if abs(x-other.X) < thresh {
 				newX = other.X
 				guides = append(guides, guide{Type: "vertical", Value: newX})
 			}
 
-			if abs(y-other.Y-int32(other.PxH)) < thresh {
-				newY = other.Y + int32(other.PxH)
+			if abs(y-other.Y-otherScaledHeight) < thresh {
+				newY = other.Y + otherScaledHeight
 				guides = append(guides, guide{Type: "horizontal", Value: newY})
-			} else if abs(y+int32(mon.PxH)-other.Y) < thresh {
-				newY = other.Y - int32(mon.PxH)
+			} else if abs(y+monScaledHeight-other.Y) < thresh {
+				newY = other.Y - monScaledHeight
 				guides = append(guides, guide{Type: "horizontal", Value: other.Y})
 			} else if abs(y-other.Y) < thresh {
 				newY = other.Y
@@ -241,18 +255,24 @@ func (m *model) snapPosition(mon *Monitor, x, y int32) (int32, int32, []guide) {
 		}
 
 		if m.Snap == SnapCenters || m.Snap == SnapBoth {
-			monCenterX := x + int32(mon.PxW)/2
-			monCenterY := y + int32(mon.PxH)/2
-			otherCenterX := other.X + int32(other.PxW)/2
-			otherCenterY := other.Y + int32(other.PxH)/2
+			// Use scaled dimensions for center snapping
+			monScaledWidth := int32(float32(mon.PxW) / mon.Scale)
+			monScaledHeight := int32(float32(mon.PxH) / mon.Scale)
+			otherScaledWidth := int32(float32(other.PxW) / other.Scale)
+			otherScaledHeight := int32(float32(other.PxH) / other.Scale)
+
+			monCenterX := x + monScaledWidth/2
+			monCenterY := y + monScaledHeight/2
+			otherCenterX := other.X + otherScaledWidth/2
+			otherCenterY := other.Y + otherScaledHeight/2
 
 			if abs(monCenterX-otherCenterX) < thresh {
-				newX = otherCenterX - int32(mon.PxW)/2
+				newX = otherCenterX - monScaledWidth/2
 				guides = append(guides, guide{Type: "vertical", Value: otherCenterX})
 			}
 
 			if abs(monCenterY-otherCenterY) < thresh {
-				newY = otherCenterY - int32(mon.PxH)/2
+				newY = otherCenterY - monScaledHeight/2
 				guides = append(guides, guide{Type: "horizontal", Value: otherCenterY})
 			}
 		}
