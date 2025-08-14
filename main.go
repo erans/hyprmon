@@ -15,13 +15,20 @@ func main() {
 	var showProfileMenu bool
 	var listProfilesNames bool
 	var showVersion bool
+	var configPath string
 
 	flag.StringVar(&profileName, "profile", "", "Apply a specific profile")
 	flag.BoolVar(&showProfileMenu, "profiles", false, "Show profile selection menu")
 	flag.BoolVar(&listProfilesNames, "list-profiles", false, "List available profile names")
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
 	flag.BoolVar(&showVersion, "v", false, "Show version information (short)")
+	flag.StringVar(&configPath, "cfg", "", "Path to store/read configuration files (default: ~/.config/hyprmon)")
 	flag.Parse()
+
+	// Set custom config path if provided
+	if configPath != "" {
+		customConfigPath = configPath
+	}
 
 	// Handle version flag
 	if showVersion {
