@@ -194,7 +194,7 @@ jobs:
 
       - name: Upload coverage
         if: success()
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./coverage.txt
           flags: unittests
