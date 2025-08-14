@@ -13,6 +13,9 @@ import (
 	"golang.org/x/term"
 )
 
+// customConfigPath holds the custom configuration path set via -cfg flag
+var customConfigPath string
+
 type Profile struct {
 	Name      string    `json:"name"`
 	Monitors  []Monitor `json:"monitors"`
@@ -21,6 +24,12 @@ type Profile struct {
 }
 
 func getProfilesDir() string {
+	// Use custom config path if provided via -cfg flag
+	if customConfigPath != "" {
+		return filepath.Join(customConfigPath, "profiles")
+	}
+	
+	// Otherwise use default path
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
