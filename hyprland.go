@@ -288,6 +288,28 @@ func getCurrentMonitorNames() ([]string, error) {
 }
 
 func migrateOrphanedWorkspaces(previousMonitorNames, currentMonitorNames []string) error {
+	// Check if we're switching to a single monitor setup
+	if len(currentMonitorNames) == 1 {
+		// Move all workspaces to the single active monitor
+		workspaces, err := readWorkspaces()
+		if err != nil {
+			return fmt.Errorf("failed to read workspaces: %w", err)
+		}
+
+		targetMonitor := currentMonitorNames[0]
+		for _, workspace := range workspaces {
+			// Move workspace if it's not already on the target monitor
+			if workspace.Monitor != targetMonitor {
+				cmd := fmt.Sprintf("hyprctl dispatch moveworkspacetomonitor %d %s", workspace.ID, targetMonitor)
+				if err := exec.Command("sh", "-c", cmd).Run(); err != nil {
+					return fmt.Errorf("failed to migrate workspace %d to monitor %s: %w", workspace.ID, targetMonitor, err)
+				}
+			}
+		}
+		return nil
+	}
+
+	// Original logic for multiple monitors - only migrate from removed monitors
 	removedMonitors := findRemovedMonitors(previousMonitorNames, currentMonitorNames)
 	if len(removedMonitors) == 0 {
 		return nil

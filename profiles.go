@@ -28,7 +28,7 @@ func getProfilesDir() string {
 	if customConfigPath != "" {
 		return filepath.Join(customConfigPath, "profiles")
 	}
-	
+
 	// Otherwise use default path
 	home, err := os.UserHomeDir()
 	if err != nil {

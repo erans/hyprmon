@@ -353,23 +353,26 @@ func (m model) renderMonitor(desktop [][]rune, mon Monitor, selected bool) {
 
 	for y := ty1; y <= ty2 && y < len(desktop); y++ {
 		for x := tx1; x <= tx2 && x < len(desktop[0]); x++ {
-			if y == ty1 {
-				if x == tx1 {
+			switch y {
+			case ty1:
+				switch x {
+				case tx1:
 					desktop[y][x] = boxRunes.topLeft
-				} else if x == tx2 {
+				case tx2:
 					desktop[y][x] = boxRunes.topRight
-				} else {
+				default:
 					desktop[y][x] = boxRunes.horizontal
 				}
-			} else if y == ty2 {
-				if x == tx1 {
+			case ty2:
+				switch x {
+				case tx1:
 					desktop[y][x] = boxRunes.bottomLeft
-				} else if x == tx2 {
+				case tx2:
 					desktop[y][x] = boxRunes.bottomRight
-				} else {
+				default:
 					desktop[y][x] = boxRunes.horizontal
 				}
-			} else {
+			default:
 				if x == tx1 || x == tx2 {
 					desktop[y][x] = boxRunes.vertical
 				}
@@ -423,14 +426,15 @@ func (m model) renderMonitor(desktop [][]rune, mon Monitor, selected bool) {
 }
 
 func (m model) renderGuide(desktop [][]rune, guide guide) {
-	if guide.Type == "vertical" {
+	switch guide.Type {
+	case "vertical":
 		x, _ := m.worldToTerm(guide.Value, 0)
 		if x >= 0 && x < len(desktop[0]) {
 			for y := 0; y < len(desktop); y++ {
 				desktop[y][x] = '│'
 			}
 		}
-	} else if guide.Type == "horizontal" {
+	case "horizontal":
 		_, y := m.worldToTerm(0, guide.Value)
 		if y >= 0 && y < len(desktop) {
 			for x := 0; x < len(desktop[0]); x++ {
