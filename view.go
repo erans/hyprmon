@@ -304,8 +304,12 @@ func (m model) renderDesktop() string {
 }
 
 func (m model) renderMonitor(desktop [][]rune, mon Monitor, selected bool) {
+	// Use scaled dimensions for rendering
+	scaledWidth := int32(float32(mon.PxW) / mon.Scale)
+	scaledHeight := int32(float32(mon.PxH) / mon.Scale)
+
 	tx1, ty1 := m.worldToTerm(mon.X, mon.Y)
-	tx2, ty2 := m.worldToTerm(mon.X+int32(mon.PxW), mon.Y+int32(mon.PxH))
+	tx2, ty2 := m.worldToTerm(mon.X+scaledWidth, mon.Y+scaledHeight)
 
 	if tx1 < 0 {
 		tx1 = 0
