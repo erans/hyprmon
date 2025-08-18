@@ -32,7 +32,7 @@ HyprMon is a TUI (Terminal User Interface) tool for configuring monitors on Arch
 ### Build from Source
 
 ```bash
-git clone https://github.com/yourusername/hyprmon.git
+git clone https://github.com/erans/hyprmon.git
 cd hyprmon
 go build -o hyprmon
 sudo mv hyprmon /usr/local/bin/
