@@ -145,6 +145,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	// Handle advanced settings dialog if it's shown
+	if m.ShowAdvancedSettings {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "enter":
+				// Apply settings and close dialog
+				m.ShowAdvancedSettings = false
+				m.Status = "Advanced settings applied"
+				return m, nil
+			case "esc":
+				// Cancel and close dialog
+				m.ShowAdvancedSettings = false
+				m.Status = "Advanced settings cancelled"
+				return m, nil
+			case "ctrl+c":
+				// Allow force quitting
+				return m, tea.Quit
+			}
+		}
+
+		// Pass other messages to advanced settings
+		newSettings, cmd := m.AdvancedSettings.Update(msg)
+		m.AdvancedSettings = newSettings
+		return m, cmd
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.World.TermW = msg.Width
@@ -401,6 +428,27 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			mon := m.Monitors[m.Selected]
 			m.ScalePicker = newScalePicker(mon.Name, mon.Scale, mon.PxW, mon.PxH)
 			m.ShowScalePicker = true
+		}
+
+	case "c", "C", "d", "D":
+		// Open advanced settings dialog for selected monitor
+		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
+			// Initialize with defaults if values are not set
+			mon := &m.Monitors[m.Selected]
+			if mon.BitDepth == 0 {
+				mon.BitDepth = 8
+			}
+			if mon.ColorMode == "" {
+				mon.ColorMode = "srgb"
+			}
+			if mon.SDRBrightness == 0 {
+				mon.SDRBrightness = 1.0
+			}
+			if mon.SDRSaturation == 0 {
+				mon.SDRSaturation = 1.0
+			}
+			m.AdvancedSettings = newAdvancedSettingsModel(mon)
+			m.ShowAdvancedSettings = true
 		}
 
 	case "a", "A":

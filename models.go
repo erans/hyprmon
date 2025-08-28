@@ -22,6 +22,14 @@ type Monitor struct {
 	EDIDName string
 	Modes    []Mode
 
+	// Advanced display settings
+	BitDepth      uint8   // 8 or 10
+	ColorMode     string  // "auto", "srgb", "wide", "edid", "hdr", "hdredid"
+	SDRBrightness float32 // 1.0 default, typically 1.0-2.0
+	SDRSaturation float32 // 1.0 default
+	VRR           int     // 0=off, 1=on, 2=fullscreen-only
+	Transform     int     // 0-7 for rotation/flip
+
 	Dragging bool
 	DragOffX int32
 	DragOffY int32
@@ -67,13 +75,15 @@ type model struct {
 	LastMouseY  int
 
 	// Sub-views
-	ShowScalePicker  bool
-	ScalePicker      scalePickerModel
-	ShowProfileInput bool
-	ProfileInput     profileInputModel
-	ShowHelp         bool
-	HelpScrollOffset int  // Scroll position for help screen
-	OpenProfiles     bool // Flag to open profiles page
+	ShowScalePicker      bool
+	ScalePicker          scalePickerModel
+	ShowProfileInput     bool
+	ProfileInput         profileInputModel
+	ShowHelp             bool
+	HelpScrollOffset     int  // Scroll position for help screen
+	OpenProfiles         bool // Flag to open profiles page
+	ShowAdvancedSettings bool
+	AdvancedSettings     advancedSettingsModel
 
 	// Monitor tracking for workspace migration
 	PreviousMonitorNames []string

@@ -57,6 +57,11 @@ func (m model) View() string {
 		return m.ScalePicker.View()
 	}
 
+	// Show advanced settings dialog if active
+	if m.ShowAdvancedSettings {
+		return m.AdvancedSettings.View()
+	}
+
 	// Allow rendering even with default sizes
 	if m.World.TermW <= 0 {
 		m.World.TermW = 80
@@ -135,6 +140,7 @@ func (m model) renderHelp() string {
 		{"G", "Cycle grid size (1, 8, 16, 32, 64 px)"},
 		{"L", "Cycle snap mode (Off, Edges, Centers, Both)"},
 		{"R", "Open scale adjustment dialog"},
+		{"C/D", "Open advanced display settings"},
 		{"A", "Apply the changes right now (doesn't persist)"},
 		{"S", "Save current configuration to Hyprland. Will persist restarts"},
 		{"O", "Open profiles page"},
@@ -397,28 +403,62 @@ func (m model) renderMonitor(desktop [][]rune, mon Monitor, selected bool) {
 		}
 	}
 
-	// Only show details for active monitors (dimmed effect for inactive)
-	if mon.Active {
-		resLabel := fmt.Sprintf("%dx%d@%.0fHz", mon.PxW, mon.PxH, mon.Hz)
-		if len(resLabel) > tx2-tx1-2 {
-			resLabel = resLabel[:tx2-tx1-2]
+	// Add resolution and refresh rate info
+	resLabel := fmt.Sprintf("%dx%d@%.0fHz", mon.PxW, mon.PxH, mon.Hz)
+	if len(resLabel) > tx2-tx1-2 {
+		resLabel = resLabel[:tx2-tx1-2]
+	}
+	if ty1+2 < len(desktop) && tx1+1 < len(desktop[0]) {
+		for i, r := range resLabel {
+			if tx1+1+i < tx2 {
+				desktop[ty1+2][tx1+1+i] = r
+			}
 		}
-		if ty1+2 < len(desktop) && ty1+2 < ty2 && tx1+1 < len(desktop[0]) {
-			for i, r := range resLabel {
+	}
+
+	// Add advanced settings indicators
+	var indicators []string
+	if mon.BitDepth == 10 {
+		indicators = append(indicators, "10bit")
+	}
+	if mon.ColorMode == "hdr" || mon.ColorMode == "hdredid" {
+		indicators = append(indicators, "HDR")
+	}
+	if mon.VRR > 0 {
+		indicators = append(indicators, "VRR")
+	}
+	if mon.Transform > 0 {
+		transforms := []string{"", "90°", "180°", "270°", "↕", "↕90°", "↕180°", "↕270°"}
+		if mon.Transform < len(transforms) {
+			indicators = append(indicators, transforms[mon.Transform])
+		}
+	}
+
+	if len(indicators) > 0 {
+		indicatorLabel := strings.Join(indicators, " ")
+		if len(indicatorLabel) > tx2-tx1-2 {
+			indicatorLabel = indicatorLabel[:tx2-tx1-2]
+		}
+		if ty1+3 < len(desktop) && tx1+1 < len(desktop[0]) {
+			for i, r := range indicatorLabel {
 				if tx1+1+i < tx2 {
-					desktop[ty1+2][tx1+1+i] = r
+					desktop[ty1+3][tx1+1+i] = r
 				}
 			}
 		}
+	}
 
+	// Add scale info if significantly different from 1.0
+	if mon.Active && (mon.Scale < 0.95 || mon.Scale > 1.05) {
 		scaleLabel := fmt.Sprintf("x%.2f", mon.Scale)
 		if len(scaleLabel) > tx2-tx1-2 {
 			scaleLabel = scaleLabel[:tx2-tx1-2]
 		}
-		if ty1+3 < len(desktop) && ty1+3 < ty2 && tx1+1 < len(desktop[0]) {
+		// Place scale in the corner if there's room
+		if ty1+4 < ty2 && ty1+4 < len(desktop) && tx1+1 < len(desktop[0]) {
 			for i, r := range scaleLabel {
 				if tx1+1+i < tx2 {
-					desktop[ty1+3][tx1+1+i] = r
+					desktop[ty1+4][tx1+1+i] = r
 				}
 			}
 		}
@@ -477,6 +517,7 @@ func (m model) renderFooter() string {
 		{"G grid", "G grid", "G", 2},
 		{"L snap", "L snap", "L", 2},
 		{"R scale", "R scale", "R", 1},
+		{"C advanced", "C adv", "C", 1},
 		{"A apply", "A apply", "A", 2},
 		{"S save", "S save", "S", 2},
 		{"O profiles", "O prof", "O", 3},

@@ -124,8 +124,38 @@ func parseMode(modeStr string) *Mode {
 func applyMonitor(m Monitor) error {
 	var cmd string
 	if m.Active {
-		cmd = fmt.Sprintf("hyprctl keyword monitor \"%s,%dx%d@%.2f,%dx%d,%.2f\"",
+		// Build base command
+		cmd = fmt.Sprintf("hyprctl keyword monitor \"%s,%dx%d@%.2f,%dx%d,%.2f",
 			m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale)
+
+		// Add advanced settings
+		if m.BitDepth == 10 {
+			cmd += ",bitdepth,10"
+		}
+
+		if m.ColorMode != "" && m.ColorMode != "srgb" {
+			cmd += fmt.Sprintf(",cm,%s", m.ColorMode)
+		}
+
+		// SDR settings only apply when in HDR mode
+		if m.ColorMode == "hdr" || m.ColorMode == "hdredid" {
+			if m.SDRBrightness != 0 && m.SDRBrightness != 1.0 {
+				cmd += fmt.Sprintf(",sdrbrightness,%.2f", m.SDRBrightness)
+			}
+			if m.SDRSaturation != 0 && m.SDRSaturation != 1.0 {
+				cmd += fmt.Sprintf(",sdrsaturation,%.2f", m.SDRSaturation)
+			}
+		}
+
+		if m.VRR > 0 {
+			cmd += fmt.Sprintf(",vrr,%d", m.VRR)
+		}
+
+		if m.Transform > 0 {
+			cmd += fmt.Sprintf(",transform,%d", m.Transform)
+		}
+
+		cmd += "\""
 	} else {
 		cmd = fmt.Sprintf("hyprctl keyword monitor \"%s,disable\"", m.Name)
 	}
@@ -187,6 +217,28 @@ func writeConfig(monitors []Monitor) error {
 					if m.Active {
 						monLine = fmt.Sprintf("monitor=%s,%dx%d@%.2f,%dx%d,%.2f",
 							m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale)
+
+						// Add advanced settings
+						if m.BitDepth == 10 {
+							monLine += ",bitdepth,10"
+						}
+						if m.ColorMode != "" && m.ColorMode != "srgb" {
+							monLine += fmt.Sprintf(",cm,%s", m.ColorMode)
+						}
+						if m.ColorMode == "hdr" || m.ColorMode == "hdredid" {
+							if m.SDRBrightness != 0 && m.SDRBrightness != 1.0 {
+								monLine += fmt.Sprintf(",sdrbrightness,%.2f", m.SDRBrightness)
+							}
+							if m.SDRSaturation != 0 && m.SDRSaturation != 1.0 {
+								monLine += fmt.Sprintf(",sdrsaturation,%.2f", m.SDRSaturation)
+							}
+						}
+						if m.VRR > 0 {
+							monLine += fmt.Sprintf(",vrr,%d", m.VRR)
+						}
+						if m.Transform > 0 {
+							monLine += fmt.Sprintf(",transform,%d", m.Transform)
+						}
 					} else {
 						monLine = fmt.Sprintf("monitor=%s,disable", m.Name)
 					}
@@ -214,6 +266,28 @@ func writeConfig(monitors []Monitor) error {
 			if m.Active {
 				monLine = fmt.Sprintf("monitor=%s,%dx%d@%.2f,%dx%d,%.2f",
 					m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale)
+
+				// Add advanced settings
+				if m.BitDepth == 10 {
+					monLine += ",bitdepth,10"
+				}
+				if m.ColorMode != "" && m.ColorMode != "srgb" {
+					monLine += fmt.Sprintf(",cm,%s", m.ColorMode)
+				}
+				if m.ColorMode == "hdr" || m.ColorMode == "hdredid" {
+					if m.SDRBrightness != 0 && m.SDRBrightness != 1.0 {
+						monLine += fmt.Sprintf(",sdrbrightness,%.2f", m.SDRBrightness)
+					}
+					if m.SDRSaturation != 0 && m.SDRSaturation != 1.0 {
+						monLine += fmt.Sprintf(",sdrsaturation,%.2f", m.SDRSaturation)
+					}
+				}
+				if m.VRR > 0 {
+					monLine += fmt.Sprintf(",vrr,%d", m.VRR)
+				}
+				if m.Transform > 0 {
+					monLine += fmt.Sprintf(",transform,%d", m.Transform)
+				}
 			} else {
 				monLine = fmt.Sprintf("monitor=%s,disable", m.Name)
 			}
