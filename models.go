@@ -77,6 +77,8 @@ type model struct {
 	// Sub-views
 	ShowScalePicker      bool
 	ScalePicker          scalePickerModel
+	ShowModePicker       bool
+	ModePicker           modePickerModel
 	ShowProfileInput     bool
 	ProfileInput         profileInputModel
 	ShowHelp             bool

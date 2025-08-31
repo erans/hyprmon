@@ -57,6 +57,11 @@ func (m model) View() string {
 		return m.ScalePicker.View()
 	}
 
+	// Show mode picker if active
+	if m.ShowModePicker {
+		return m.ModePicker.View()
+	}
+
 	// Show advanced settings dialog if active
 	if m.ShowAdvancedSettings {
 		return m.AdvancedSettings.View()

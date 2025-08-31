@@ -9,6 +9,10 @@ HyprMon is a TUI (Terminal User Interface) tool for configuring monitors on Arch
 - **Smart Snapping**: Automatic edge and center alignment with visual guides
 - **Grid Movement**: Configurable grid sizes (1, 8, 16, 32, 64 pixels)
 - **Scale Selection**: Interactive menu with common DPI scaling values (0.5x to 3.0x)
+- **Resolution & Refresh Rate**: Choose from all available display modes (1080p@144Hz, 4K@60Hz, etc.)
+- **Advanced Display Settings**: Color depth (8/10-bit), color management (sRGB/Wide/HDR), VRR, rotation/transform
+- **HDR Support**: HDR color mode with SDR brightness and saturation controls
+- **Visual Indicators**: Monitor boxes show HDR, 10-bit, VRR, and transform status
 - **Live Apply**: Instantly apply changes to Hyprland or save them to configuration
 - **Safe Rollback**: Revert to previous configuration if something goes wrong
 - **Automatic Backups**: Creates timestamped backups before modifying config files
@@ -22,14 +26,20 @@ HyprMon is a TUI (Terminal User Interface) tool for configuring monitors on Arch
 
 ## Installation
 
-### Prerequisites
+### via AUR
+
+`yay -S hyprmon-bin`
+
+### From source
+
+#### Prerequisites
 
 - Go 1.20 or higher
 - Hyprland window manager
 - `hyprctl` command available
 - Optional: `wlr-randr` for additional monitor detection
 
-### Build from Source
+#### Build from Source
 
 ```bash
 git clone https://github.com/erans/hyprmon.git
@@ -64,8 +74,10 @@ hyprmon profiles
 | `G` | Change grid size (1, 8, 16, 32, 64 px) |
 | `L` | Toggle snap mode (Off, Edges, Centers, Both) |
 | `R` | Open scale selector with common DPI values |
+| `F` | Open resolution & refresh rate mode picker |
 | `[` / `]` | Decrease/Increase scale by 0.05 |
 | `Enter` or `Space` | Toggle monitor active/inactive |
+| `C` or `D` | Open advanced display settings dialog |
 | `A` | Apply changes live to Hyprland |
 | `S` | Save changes to configuration file |
 | `P` | Save current layout as named profile |
@@ -87,6 +99,29 @@ hyprmon profiles
 - **Gray boxes**: Inactive monitors
 - **Double border**: Currently selected monitor
 - **Alignment guides**: Appear when monitors align
+- **Status badges**: HDR, 10-bit, VRR, and rotation indicators on monitor boxes
+
+## Advanced Display Settings
+
+Press `C` or `D` in the main UI to open the advanced display settings dialog for the selected monitor. This allows you to configure:
+
+### Color Settings
+- **Color Depth**: Switch between 8-bit and 10-bit color depth
+- **Color Mode**: Choose from Auto, sRGB, Wide, HDR, or HDR-EDID color management
+- **SDR Controls**: When in HDR mode, adjust SDR brightness (0.5-2.0) and saturation (0.5-1.5)
+
+### Display Features  
+- **VRR (Variable Refresh Rate)**: Configure VRR mode as Off, On, or Fullscreen-only
+- **Transform**: Set monitor rotation (Normal, 90°, 180°, 270°) or flipping
+
+### Advanced Dialog Controls
+| Key | Action |
+|-----|--------|
+| `Tab` / `↑↓` | Navigate between settings |
+| `Space` | Toggle boolean settings |
+| `←→` | Adjust slider values (SDR brightness/saturation) |
+| `Enter` | Apply changes and close dialog |
+| `Esc` | Cancel changes and close dialog |
 
 ## Profiles
 
@@ -173,11 +208,11 @@ Before any configuration changes, HyprMon creates a backup:
 ## Future Features (Roadmap)
 
 - [x] Monitor profiles (Home, Work, Presentation modes)
-- [ ] Resolution and refresh rate picker
+- [x] Advanced display settings (color depth, HDR, VRR, rotation)
+- [x] DPI-aware positioning (accounts for monitor scale in layout)
+- [x] Resolution and refresh rate picker
 - [ ] Alignment menu (distribute, same size, etc.)
 - [ ] Auto-switching profiles on monitor hotplug
-- [ ] DPI-aware positioning
-- [ ] Profile naming in the UI (currently uses timestamps)
 
 ## License
 

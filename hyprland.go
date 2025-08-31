@@ -87,6 +87,28 @@ func readMonitors() ([]Monitor, error) {
 	return monitors, nil
 }
 
+// getAvailableModes returns the available modes for a specific monitor
+func getAvailableModes(monitorName string) ([]string, error) {
+	cmd := exec.Command("hyprctl", "monitors", "all", "-j")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute hyprctl: %w", err)
+	}
+
+	var hyprMonitors []hyprMonitor
+	if err := json.Unmarshal(output, &hyprMonitors); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	for _, hm := range hyprMonitors {
+		if hm.Name == monitorName {
+			return hm.AvailableModes, nil
+		}
+	}
+
+	return nil, fmt.Errorf("monitor %s not found", monitorName)
+}
+
 func parseMode(modeStr string) *Mode {
 	parts := strings.Split(modeStr, "@")
 	if len(parts) != 2 {

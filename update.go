@@ -145,6 +145,37 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	// Handle mode picker if it's shown
+	if m.ShowModePicker {
+		switch msg := msg.(type) {
+		case modeSelectedMsg:
+			if m.Selected >= 0 && m.Selected < len(m.Monitors) {
+				m.Monitors[m.Selected].PxW = msg.mode.Width
+				m.Monitors[m.Selected].PxH = msg.mode.Height
+				m.Monitors[m.Selected].Hz = msg.mode.RefreshRate
+				m.Status = fmt.Sprintf("Mode set to %dx%d@%.2fHz", msg.mode.Width, msg.mode.Height, msg.mode.RefreshRate)
+			}
+			m.ShowModePicker = false
+			return m, nil
+
+		case modeCancelledMsg:
+			m.ShowModePicker = false
+			m.Status = "Mode selection cancelled"
+			return m, nil
+
+		case tea.KeyMsg:
+			if msg.String() == "q" || msg.String() == "ctrl+c" {
+				// Allow quitting from mode picker
+				return m, tea.Quit
+			}
+		}
+
+		// Pass other messages to mode picker
+		newPicker, cmd := m.ModePicker.Update(msg)
+		m.ModePicker = newPicker.(modePickerModel)
+		return m, cmd
+	}
+
 	// Handle advanced settings dialog if it's shown
 	if m.ShowAdvancedSettings {
 		switch msg := msg.(type) {
@@ -428,6 +459,19 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			mon := m.Monitors[m.Selected]
 			m.ScalePicker = newScalePicker(mon.Name, mon.Scale, mon.PxW, mon.PxH)
 			m.ShowScalePicker = true
+		}
+
+	case "f", "F":
+		// Open mode picker for selected monitor
+		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
+			mon := m.Monitors[m.Selected]
+			modes, err := getAvailableModes(mon.Name)
+			if err != nil {
+				m.Status = fmt.Sprintf("Failed to get available modes: %v", err)
+				return m, nil
+			}
+			m.ModePicker = newModePicker(mon.Name, mon.PxW, mon.PxH, mon.Hz, modes)
+			m.ShowModePicker = true
 		}
 
 	case "c", "C", "d", "D":
