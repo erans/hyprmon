@@ -312,7 +312,7 @@ func (m advancedSettingsModel) renderColorMode() string {
 	}
 
 	var parts []string
-	for _, key := range []string{"auto", "srgb", "wide", "hdr"} {
+	for _, key := range []string{"auto", "srgb", "wide", "edid", "hdr", "hdredid"} {
 		if m.monitor.ColorMode == key {
 			parts = append(parts, "● "+modes[key])
 		} else {
