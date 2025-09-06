@@ -284,16 +284,36 @@ git push origin "$NEW_VERSION"
 # Clean up
 rm "$TEMP_NOTES"
 
-# Ask about GitHub release
+# Create GitHub release if gh CLI is available
 echo ""
 print_color $BLUE "Tag created and pushed successfully!"
-print_color $YELLOW "GitHub Actions will automatically create a release from this tag."
+
+if command -v gh &> /dev/null; then
+    print_color $BLUE "GitHub CLI detected. Creating release..."
+    
+    # Check if authenticated
+    if gh auth status &> /dev/null; then
+        # Create release with generated notes
+        if gh release create "$NEW_VERSION" --title "Release $NEW_VERSION" --notes "$RELEASE_NOTES"; then
+            print_color $GREEN "GitHub release created successfully!"
+            print_color $GREEN "View release at: $(gh repo view --web 2>/dev/null | grep -o 'https://[^[:space:]]*')/releases/tag/$NEW_VERSION"
+        else
+            print_color $YELLOW "Failed to create GitHub release. GitHub Actions will handle it automatically."
+        fi
+    else
+        print_color $YELLOW "GitHub CLI not authenticated. Please run 'gh auth login' for automatic release creation."
+        print_color $YELLOW "GitHub Actions will automatically create a release from this tag."
+    fi
+else
+    print_color $YELLOW "GitHub CLI (gh) not found. GitHub Actions will automatically create a release from this tag."
+fi
+
 echo ""
 print_color $GREEN "You can monitor the release at:"
-echo "  https://github.com/$(git remote get-url origin | sed 's/.*github.com[:\/]\(.*\)\.git/\1/')/actions"
+echo "  https://github.com/$(git remote get-url origin | sed 's/.*github.com[:\/]\(.*\)\.git/\1/')/releases"
 echo ""
 
-# Optionally trigger manual workflow
+# Optionally trigger manual workflow  
 print_color $BLUE "Alternatively, you can trigger a manual release workflow."
 read -p "Would you like instructions for manual release? (y/N): " -n 1 -r
 echo
