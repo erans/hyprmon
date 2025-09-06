@@ -142,6 +142,19 @@ func (m *model) updateWorld() {
 	}
 }
 
+// getEffectiveDimensions returns the effective width and height considering transform rotation
+func (m *model) getEffectiveDimensions(mon Monitor) (int32, int32) {
+	scaledWidth := int32(float32(mon.PxW) / mon.Scale)
+	scaledHeight := int32(float32(mon.PxH) / mon.Scale)
+
+	// For 90° and 270° rotations, swap width and height
+	if mon.Transform == 1 || mon.Transform == 3 || mon.Transform == 5 || mon.Transform == 7 {
+		return scaledHeight, scaledWidth
+	}
+
+	return scaledWidth, scaledHeight
+}
+
 func (m *model) worldToTerm(x, y int32) (int, int) {
 	// Use desktop dimensions (accounting for borders and UI elements)
 	desktopWidth := m.World.TermW - 3   // Border (2) + margin (1)
@@ -165,12 +178,11 @@ func (m *model) termToWorld(x, y int) (int32, int32) {
 func (m *model) hitTest(x, y int) int {
 	wx, wy := m.termToWorld(x, y)
 	for i, mon := range m.Monitors {
-		// Use scaled dimensions for hit testing
-		scaledWidth := int32(float32(mon.PxW) / mon.Scale)
-		scaledHeight := int32(float32(mon.PxH) / mon.Scale)
+		// Use effective dimensions considering transform rotation
+		effectiveWidth, effectiveHeight := m.getEffectiveDimensions(mon)
 
-		if wx >= mon.X && wx < mon.X+scaledWidth &&
-			wy >= mon.Y && wy < mon.Y+scaledHeight {
+		if wx >= mon.X && wx < mon.X+effectiveWidth &&
+			wy >= mon.Y && wy < mon.Y+effectiveHeight {
 			return i
 		}
 	}
@@ -237,28 +249,26 @@ func (m *model) snapPosition(mon *Monitor, x, y int32) (int32, int32, []guide) {
 		}
 
 		if m.Snap == SnapEdges || m.Snap == SnapBoth {
-			// Use scaled dimensions for snapping
-			monScaledWidth := int32(float32(mon.PxW) / mon.Scale)
-			monScaledHeight := int32(float32(mon.PxH) / mon.Scale)
-			otherScaledWidth := int32(float32(other.PxW) / other.Scale)
-			otherScaledHeight := int32(float32(other.PxH) / other.Scale)
+			// Use effective dimensions considering transform rotation
+			monEffectiveWidth, monEffectiveHeight := m.getEffectiveDimensions(*mon)
+			otherEffectiveWidth, otherEffectiveHeight := m.getEffectiveDimensions(other)
 
-			if abs(x-other.X-otherScaledWidth) < thresh {
-				newX = other.X + otherScaledWidth
+			if abs(x-other.X-otherEffectiveWidth) < thresh {
+				newX = other.X + otherEffectiveWidth
 				guides = append(guides, guide{Type: "vertical", Value: newX})
-			} else if abs(x+monScaledWidth-other.X) < thresh {
-				newX = other.X - monScaledWidth
+			} else if abs(x+monEffectiveWidth-other.X) < thresh {
+				newX = other.X - monEffectiveWidth
 				guides = append(guides, guide{Type: "vertical", Value: other.X})
 			} else if abs(x-other.X) < thresh {
 				newX = other.X
 				guides = append(guides, guide{Type: "vertical", Value: newX})
 			}
 
-			if abs(y-other.Y-otherScaledHeight) < thresh {
-				newY = other.Y + otherScaledHeight
+			if abs(y-other.Y-otherEffectiveHeight) < thresh {
+				newY = other.Y + otherEffectiveHeight
 				guides = append(guides, guide{Type: "horizontal", Value: newY})
-			} else if abs(y+monScaledHeight-other.Y) < thresh {
-				newY = other.Y - monScaledHeight
+			} else if abs(y+monEffectiveHeight-other.Y) < thresh {
+				newY = other.Y - monEffectiveHeight
 				guides = append(guides, guide{Type: "horizontal", Value: other.Y})
 			} else if abs(y-other.Y) < thresh {
 				newY = other.Y
@@ -267,24 +277,22 @@ func (m *model) snapPosition(mon *Monitor, x, y int32) (int32, int32, []guide) {
 		}
 
 		if m.Snap == SnapCenters || m.Snap == SnapBoth {
-			// Use scaled dimensions for center snapping
-			monScaledWidth := int32(float32(mon.PxW) / mon.Scale)
-			monScaledHeight := int32(float32(mon.PxH) / mon.Scale)
-			otherScaledWidth := int32(float32(other.PxW) / other.Scale)
-			otherScaledHeight := int32(float32(other.PxH) / other.Scale)
+			// Use effective dimensions considering transform rotation for center snapping
+			monEffectiveWidth, monEffectiveHeight := m.getEffectiveDimensions(*mon)
+			otherEffectiveWidth, otherEffectiveHeight := m.getEffectiveDimensions(other)
 
-			monCenterX := x + monScaledWidth/2
-			monCenterY := y + monScaledHeight/2
-			otherCenterX := other.X + otherScaledWidth/2
-			otherCenterY := other.Y + otherScaledHeight/2
+			monCenterX := x + monEffectiveWidth/2
+			monCenterY := y + monEffectiveHeight/2
+			otherCenterX := other.X + otherEffectiveWidth/2
+			otherCenterY := other.Y + otherEffectiveHeight/2
 
 			if abs(monCenterX-otherCenterX) < thresh {
-				newX = otherCenterX - monScaledWidth/2
+				newX = otherCenterX - monEffectiveWidth/2
 				guides = append(guides, guide{Type: "vertical", Value: otherCenterX})
 			}
 
 			if abs(monCenterY-otherCenterY) < thresh {
-				newY = otherCenterY - monScaledHeight/2
+				newY = otherCenterY - monEffectiveHeight/2
 				guides = append(guides, guide{Type: "horizontal", Value: otherCenterY})
 			}
 		}
