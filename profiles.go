@@ -246,12 +246,7 @@ func compareMonitorConfigurations(current, saved []Monitor) bool {
 	// Compare each monitor's configuration
 	for name, currentMonitor := range currentMap {
 		savedMonitor := savedMap[name]
-		a, _ := json.Marshal(currentMonitor)
-		b, _ := json.Marshal(savedMonitor)
 
-		fmt.Println(string(a), string(b))
-		// Compare key configuration parameters
-		// Use tolerance for floating-point comparisons
 		const tolerance float32 = 1
 		if currentMonitor.PxW == savedMonitor.PxW ||
 			currentMonitor.PxH == savedMonitor.PxH ||
