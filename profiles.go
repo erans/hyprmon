@@ -246,22 +246,24 @@ func compareMonitorConfigurations(current, saved []Monitor) bool {
 	// Compare each monitor's configuration
 	for name, currentMonitor := range currentMap {
 		savedMonitor := savedMap[name]
+		a, _ := json.Marshal(currentMonitor)
+		b, _ := json.Marshal(savedMonitor)
 
+		fmt.Println(string(a), string(b))
 		// Compare key configuration parameters
 		// Use tolerance for floating-point comparisons
-		const tolerance float32 = 0.1
-		if currentMonitor.PxW != savedMonitor.PxW ||
-			currentMonitor.PxH != savedMonitor.PxH ||
-			abs32(currentMonitor.Hz-savedMonitor.Hz) > tolerance ||
-			abs32(currentMonitor.Scale-savedMonitor.Scale) > tolerance ||
-			currentMonitor.X != savedMonitor.X ||
-			currentMonitor.Y != savedMonitor.Y ||
-			currentMonitor.Active != savedMonitor.Active {
-			return false
+		const tolerance float32 = 1
+		if currentMonitor.PxW == savedMonitor.PxW ||
+			currentMonitor.PxH == savedMonitor.PxH ||
+			currentMonitor.Name == savedMonitor.Name ||
+			currentMonitor.X == savedMonitor.X ||
+			currentMonitor.Y == savedMonitor.Y ||
+			currentMonitor.Active == savedMonitor.Active {
+			return true
 		}
 	}
 
-	return true
+	return false
 }
 
 // getCurrentActiveProfile returns the name of the currently active profile by comparing
