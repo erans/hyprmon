@@ -243,22 +243,21 @@ func compareMonitorConfigurations(current, saved []Monitor) bool {
 		}
 	}
 
-	// Compare each monitor's configuration
+	// Compare each monitor's configuration - ALL monitors must match
 	for name, currentMonitor := range currentMap {
 		savedMonitor := savedMap[name]
 
-		const tolerance float32 = 1
-		if currentMonitor.PxW == savedMonitor.PxW ||
-			currentMonitor.PxH == savedMonitor.PxH ||
-			currentMonitor.Name == savedMonitor.Name ||
-			currentMonitor.X == savedMonitor.X ||
-			currentMonitor.Y == savedMonitor.Y ||
-			currentMonitor.Active == savedMonitor.Active {
-			return true
+		// Check if all key properties match for this monitor
+		if currentMonitor.PxW != savedMonitor.PxW ||
+			currentMonitor.PxH != savedMonitor.PxH ||
+			currentMonitor.X != savedMonitor.X ||
+			currentMonitor.Y != savedMonitor.Y ||
+			currentMonitor.Active != savedMonitor.Active {
+			return false // If any monitor doesn't match, configurations are different
 		}
 	}
 
-	return false
+	return true // All monitors match
 }
 
 // getCurrentActiveProfile returns the name of the currently active profile by comparing
