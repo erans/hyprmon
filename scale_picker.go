@@ -2,19 +2,23 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
 type scalePickerModel struct {
-	scales   []float32
-	selected int
-	current  float32
-	monitor  string
-	width    uint32
-	height   uint32
+	scales      []float32
+	selected    int
+	current     float32
+	monitor     string
+	width       uint32
+	height      uint32
+	customMode  bool
+	customInput textinput.Model
 }
 
 var commonScales = []float32{
@@ -30,13 +34,20 @@ func newScalePicker(monitor string, currentScale float32, width, height uint32) 
 		}
 	}
 
+	ti := textinput.New()
+	ti.Placeholder = "Enter scale (e.g., 1.5)"
+	ti.CharLimit = 10
+	ti.Width = 20
+
 	return scalePickerModel{
-		scales:   commonScales,
-		selected: selected,
-		current:  currentScale,
-		monitor:  monitor,
-		width:    width,
-		height:   height,
+		scales:      commonScales,
+		selected:    selected,
+		current:     currentScale,
+		monitor:     monitor,
+		width:       width,
+		height:      height,
+		customMode:  false,
+		customInput: ti,
 	}
 }
 
@@ -51,11 +62,44 @@ func (m scalePickerModel) Init() tea.Cmd {
 }
 
 func (m scalePickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	// Handle custom input mode
+	if m.customMode {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "esc":
+				m.customMode = false
+				m.customInput.SetValue("")
+				return m, nil
+			case "enter":
+				value := strings.TrimSpace(m.customInput.Value())
+				if scale, err := strconv.ParseFloat(value, 32); err == nil && scale > 0 && scale <= 10 {
+					return m, func() tea.Msg {
+						return scaleSelectedMsg{scale: float32(scale)}
+					}
+				}
+				// Invalid input, stay in custom mode
+				return m, nil
+			}
+		}
+		m.customInput, cmd = m.customInput.Update(msg)
+		return m, cmd
+	}
+
+	// Handle normal mode
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c", "esc":
 			return m, func() tea.Msg { return scaleCancelledMsg{} }
+
+		case "c":
+			// Enter custom mode
+			m.customMode = true
+			m.customInput.Focus()
+			return m, m.customInput.Cursor.BlinkCmd()
 
 		case "up", "k":
 			if m.selected > 0 {
@@ -115,6 +159,20 @@ func (m scalePickerModel) View() string {
 
 	s.WriteString(titleStyle.Render(fmt.Sprintf("Select Scale for %s", m.monitor)))
 	s.WriteString("\n\n")
+
+	// Custom input mode
+	if m.customMode {
+		customStyle := lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("62")).
+			Padding(1).
+			Width(40)
+
+		s.WriteString(customStyle.Render(
+			fmt.Sprintf("Enter Custom Scale:\n\n%s\n\nValid range: 0.1 - 10.0\nPress Enter to confirm, Esc to cancel", m.customInput.View()),
+		))
+		return s.String()
+	}
 
 	itemStyle := lipgloss.NewStyle().
 		PaddingLeft(2)
@@ -177,7 +235,7 @@ func (m scalePickerModel) View() string {
 	helpStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("241"))
 
-	help := "↑/↓: Navigate  •  Enter: Select  •  1: 1.00x  •  2: 2.00x  •  Esc: Cancel"
+	help := "↑/↓: Navigate  •  Enter: Select  •  c: Custom  •  1: 1.00x  •  2: 2.00x  •  Esc: Cancel"
 	s.WriteString(helpStyle.Render(help))
 
 	// Add preview of what the scale means
