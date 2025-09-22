@@ -14,12 +14,14 @@ func main() {
 	var profileName string
 	var showProfileMenu bool
 	var listProfilesNames bool
+	var showActiveProfile bool
 	var showVersion bool
 	var configPath string
 
 	flag.StringVar(&profileName, "profile", "", "Apply a specific profile")
 	flag.BoolVar(&showProfileMenu, "profiles", false, "Show profile selection menu")
 	flag.BoolVar(&listProfilesNames, "list-profiles", false, "List available profile names")
+	flag.BoolVar(&showActiveProfile, "active-profile", false, "Show currently active profile name")
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
 	flag.BoolVar(&showVersion, "v", false, "Show version information (short)")
 	flag.StringVar(&configPath, "cfg", "", "Path to store/read configuration files (default: ~/.config/hyprmon)")
@@ -33,6 +35,21 @@ func main() {
 	// Handle version flag
 	if showVersion {
 		fmt.Println(VersionInfo())
+		return
+	}
+
+	// Handle active-profile flag
+	if showActiveProfile {
+		activeProfile, err := getCurrentActiveProfile()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error getting active profile: %v\n", err)
+			os.Exit(1)
+		}
+		if activeProfile == "" {
+			fmt.Println("No active profile found")
+		} else {
+			fmt.Println(activeProfile)
+		}
 		return
 	}
 
@@ -71,9 +88,16 @@ func main() {
 			profiles = orderedProfiles
 		}
 
-		// Print one profile name per line for easy scripting
+		// Get the currently active profile
+		activeProfile, _ := getCurrentActiveProfile()
+
+		// Print one profile name per line for easy scripting, with * for active profile
 		for _, profile := range profiles {
-			fmt.Println(profile)
+			if profile == activeProfile {
+				fmt.Printf("%s *\n", profile)
+			} else {
+				fmt.Println(profile)
+			}
 		}
 		return
 	}

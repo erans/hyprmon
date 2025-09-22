@@ -212,6 +212,84 @@ func applyProfile(name string) error {
 	return nil
 }
 
+// compareMonitorConfigurations compares two monitor configurations for equality
+func compareMonitorConfigurations(current, saved []Monitor) bool {
+	if len(current) != len(saved) {
+		return false
+	}
+
+	// Create maps for easier lookup by monitor name
+	currentMap := make(map[string]Monitor)
+	savedMap := make(map[string]Monitor)
+
+	for _, m := range current {
+		currentMap[m.Name] = m
+	}
+
+	for _, m := range saved {
+		savedMap[m.Name] = m
+	}
+
+	// Check if both configurations have the same monitors
+	for name := range currentMap {
+		if _, exists := savedMap[name]; !exists {
+			return false
+		}
+	}
+
+	for name := range savedMap {
+		if _, exists := currentMap[name]; !exists {
+			return false
+		}
+	}
+
+	// Compare each monitor's configuration - ALL monitors must match
+	for name, currentMonitor := range currentMap {
+		savedMonitor := savedMap[name]
+
+		// Check if all key properties match for this monitor
+		if currentMonitor.PxW != savedMonitor.PxW ||
+			currentMonitor.PxH != savedMonitor.PxH ||
+			currentMonitor.X != savedMonitor.X ||
+			currentMonitor.Y != savedMonitor.Y ||
+			currentMonitor.Active != savedMonitor.Active {
+			return false // If any monitor doesn't match, configurations are different
+		}
+	}
+
+	return true // All monitors match
+}
+
+// getCurrentActiveProfile returns the name of the currently active profile by comparing
+// the current monitor configuration with all saved profiles
+func getCurrentActiveProfile() (string, error) {
+	// Get current monitor configuration
+	currentMonitors, err := readMonitors()
+	if err != nil {
+		return "", fmt.Errorf("failed to read current monitors: %w", err)
+	}
+
+	// Get list of all profiles
+	profiles, err := listProfiles()
+	if err != nil {
+		return "", fmt.Errorf("failed to list profiles: %w", err)
+	}
+
+	// Compare current configuration with each profile
+	for _, profileName := range profiles {
+		profile, err := loadProfile(profileName)
+		if err != nil {
+			continue // Skip profiles that can't be loaded
+		}
+
+		if compareMonitorConfigurations(currentMonitors, profile.Monitors) {
+			return profileName, nil
+		}
+	}
+
+	return "", nil // No matching profile found
+}
+
 type profileMenuModel struct {
 	profiles        []string
 	selected        int
@@ -699,6 +777,9 @@ func (m profileMenuModel) View() string {
 		return s.String()
 	}
 
+	// Get the currently active profile for display
+	activeProfile, _ := getCurrentActiveProfile()
+
 	itemStyle := lipgloss.NewStyle().
 		PaddingLeft(2)
 
@@ -714,9 +795,17 @@ func (m profileMenuModel) View() string {
 				Foreground(lipgloss.Color("238"))
 			s.WriteString(sepStyle.Render(profile))
 		} else if i == m.selected {
-			s.WriteString(selectedStyle.Render("▶ " + profile))
+			displayName := profile
+			if profile == activeProfile && profile != "[ Open Full UI ]" {
+				displayName = profile + " *"
+			}
+			s.WriteString(selectedStyle.Render("▶ " + displayName))
 		} else {
-			s.WriteString(itemStyle.Render("  " + profile))
+			displayName := profile
+			if profile == activeProfile && profile != "[ Open Full UI ]" {
+				displayName = profile + " *"
+			}
+			s.WriteString(itemStyle.Render("  " + displayName))
 		}
 		s.WriteString("\n")
 	}
