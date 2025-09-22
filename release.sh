@@ -63,9 +63,6 @@ generate_changelog() {
     local from_tag=$1
     local to_ref=${2:-HEAD}
     
-    echo "## Analyzing changes since ${from_tag}..."
-    echo ""
-    
     # Check if npx is available
     if ! command -v npx &> /dev/null; then
         print_color $YELLOW "npx not found, falling back to git log"
@@ -284,47 +281,19 @@ git push origin "$NEW_VERSION"
 # Clean up
 rm "$TEMP_NOTES"
 
-# Create GitHub release if gh CLI is available
+# GitHub Actions will automatically create the release
 echo ""
 print_color $BLUE "Tag created and pushed successfully!"
-
-if command -v gh &> /dev/null; then
-    print_color $BLUE "GitHub CLI detected. Creating release..."
-    
-    # Check if authenticated
-    if gh auth status &> /dev/null; then
-        # Create release with generated notes
-        if gh release create "$NEW_VERSION" --title "Release $NEW_VERSION" --notes "$RELEASE_NOTES"; then
-            print_color $GREEN "GitHub release created successfully!"
-            print_color $GREEN "View release at: $(gh repo view --web 2>/dev/null | grep -o 'https://[^[:space:]]*')/releases/tag/$NEW_VERSION"
-        else
-            print_color $YELLOW "Failed to create GitHub release. GitHub Actions will handle it automatically."
-        fi
-    else
-        print_color $YELLOW "GitHub CLI not authenticated. Please run 'gh auth login' for automatic release creation."
-        print_color $YELLOW "GitHub Actions will automatically create a release from this tag."
-    fi
-else
-    print_color $YELLOW "GitHub CLI (gh) not found. GitHub Actions will automatically create a release from this tag."
-fi
+print_color $GREEN "GitHub Actions will automatically build binaries and create the release."
 
 echo ""
 print_color $GREEN "You can monitor the release at:"
 echo "  https://github.com/$(git remote get-url origin | sed 's/.*github.com[:\/]\(.*\)\.git/\1/')/releases"
 echo ""
 
-# Optionally trigger manual workflow  
-print_color $BLUE "Alternatively, you can trigger a manual release workflow."
-read -p "Would you like instructions for manual release? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo ""
-    print_color $BLUE "To trigger manual release:"
-    echo "1. Go to: https://github.com/$(git remote get-url origin | sed 's/.*github.com[:\/]\(.*\)\.git/\1/')/actions/workflows/release.yml"
-    echo "2. Click 'Run workflow'"
-    echo "3. Enter version: ${NEW_VERSION}"
-    echo "4. Click 'Run workflow' button"
-fi
+# Monitor the automatic workflow
+print_color $BLUE "The release workflow should start automatically."
+echo "Monitor progress at: https://github.com/$(git remote get-url origin | sed 's/.*github.com[:\/]\(.*\)\.git/\1/')/actions"
 
 print_color $GREEN ""
 print_color $GREEN "Release ${NEW_VERSION} preparation complete! 🎉"
