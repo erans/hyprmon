@@ -30,6 +30,11 @@ type Monitor struct {
 	VRR           int     // 0=off, 1=on, 2=fullscreen-only
 	Transform     int     // 0-7 for rotation/flip
 
+	// Mirror settings
+	IsMirrored    bool     // Whether this monitor is mirroring another
+	MirrorSource  string   // Name of monitor being mirrored (empty if not mirroring)
+	MirrorTargets []string // Names of monitors mirroring this one
+
 	Dragging bool
 	DragOffX int32
 	DragOffY int32
@@ -79,6 +84,8 @@ type model struct {
 	ScalePicker          scalePickerModel
 	ShowModePicker       bool
 	ModePicker           modePickerModel
+	ShowMirrorPicker     bool
+	MirrorPicker         mirrorPickerModel
 	ShowProfileInput     bool
 	ProfileInput         profileInputModel
 	ShowHelp             bool
