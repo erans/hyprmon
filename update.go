@@ -176,6 +176,77 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	// Handle mirror picker if it's shown
+	if m.ShowMirrorPicker {
+		switch msg := msg.(type) {
+		case mirrorSelectedMsg:
+			if m.Selected >= 0 && m.Selected < len(m.Monitors) {
+				// Update mirror settings
+				mon := &m.Monitors[m.Selected]
+
+				// Clear previous mirror relationships
+				if mon.IsMirrored && mon.MirrorSource != "" {
+					// Remove this monitor from its source's targets
+					for i := range m.Monitors {
+						if m.Monitors[i].Name == mon.MirrorSource {
+							targets := m.Monitors[i].MirrorTargets
+							for j, target := range targets {
+								if target == mon.Name {
+									m.Monitors[i].MirrorTargets = append(targets[:j], targets[j+1:]...)
+									break
+								}
+							}
+							break
+						}
+					}
+				}
+
+				if msg.source == "" {
+					// Disable mirroring
+					mon.IsMirrored = false
+					mon.MirrorSource = ""
+					m.Status = fmt.Sprintf("Mirroring disabled for %s", mon.Name)
+				} else {
+					// Enable mirroring
+					mon.IsMirrored = true
+					mon.MirrorSource = msg.source
+					// Add this monitor to source's targets
+					for i := range m.Monitors {
+						if m.Monitors[i].Name == msg.source {
+							m.Monitors[i].MirrorTargets = append(m.Monitors[i].MirrorTargets, mon.Name)
+							break
+						}
+					}
+					m.Status = fmt.Sprintf("Mirroring %s to %s", mon.Name, msg.source)
+				}
+
+				// Check for configuration warnings
+				warnings := validateMirrorConfiguration(m.Monitors)
+				if len(warnings) > 0 {
+					m.Status += " | Warnings: " + warnings[0] // Show first warning
+				}
+			}
+			m.ShowMirrorPicker = false
+			return m, nil
+
+		case mirrorCancelledMsg:
+			m.ShowMirrorPicker = false
+			m.Status = "Mirror selection cancelled"
+			return m, nil
+
+		case tea.KeyMsg:
+			if msg.String() == "q" || msg.String() == "ctrl+c" {
+				// Allow quitting from mirror picker
+				return m, tea.Quit
+			}
+		}
+
+		// Pass other messages to mirror picker
+		newPicker, cmd := m.MirrorPicker.Update(msg)
+		m.MirrorPicker = newPicker.(mirrorPickerModel)
+		return m, cmd
+	}
+
 	// Handle advanced settings dialog if it's shown
 	if m.ShowAdvancedSettings {
 		switch msg := msg.(type) {
@@ -472,6 +543,14 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.ModePicker = newModePicker(mon.Name, mon.PxW, mon.PxH, mon.Hz, modes)
 			m.ShowModePicker = true
+		}
+
+	case "m", "M":
+		// Open mirror picker for selected monitor
+		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
+			mon := m.Monitors[m.Selected]
+			m.MirrorPicker = newMirrorPicker(mon.Name, mon.MirrorSource, m.Monitors)
+			m.ShowMirrorPicker = true
 		}
 
 	case "c", "C", "d", "D":

@@ -36,6 +36,7 @@ type hyprMonitor struct {
 	ActivelyTearing bool     `json:"activelyTearing"`
 	Disabled        bool     `json:"disabled"`
 	CurrentFormat   string   `json:"currentFormat"`
+	MirrorOf        string   `json:"mirrorOf"`
 	AvailableModes  []string `json:"availableModes"`
 }
 
@@ -61,6 +62,8 @@ func readMonitors() ([]Monitor, error) {
 	}
 
 	monitors := make([]Monitor, 0, len(hyprMonitors))
+
+	// First pass: create monitors without mirror relationships
 	for _, hm := range hyprMonitors {
 		modes := make([]Mode, 0, len(hm.AvailableModes))
 		for _, modeStr := range hm.AvailableModes {
@@ -80,8 +83,31 @@ func readMonitors() ([]Monitor, error) {
 			Active:   !hm.Disabled,
 			EDIDName: hm.Description,
 			Modes:    modes,
+
+			// Mirror settings
+			IsMirrored: hm.MirrorOf != "" && hm.MirrorOf != "none",
+			MirrorSource: func() string {
+				if hm.MirrorOf != "" && hm.MirrorOf != "none" {
+					return hm.MirrorOf
+				}
+				return ""
+			}(),
+			MirrorTargets: []string{}, // Will be populated in second pass
 		}
 		monitors = append(monitors, monitor)
+	}
+
+	// Second pass: build mirror targets lists
+	for i := range monitors {
+		if monitors[i].IsMirrored && monitors[i].MirrorSource != "" {
+			// Find the source monitor and add this monitor to its targets
+			for j := range monitors {
+				if monitors[j].Name == monitors[i].MirrorSource {
+					monitors[j].MirrorTargets = append(monitors[j].MirrorTargets, monitors[i].Name)
+					break
+				}
+			}
+		}
 	}
 
 	return monitors, nil
@@ -146,38 +172,44 @@ func parseMode(modeStr string) *Mode {
 func applyMonitor(m Monitor) error {
 	var cmd string
 	if m.Active {
-		// Build base command
-		cmd = fmt.Sprintf("hyprctl keyword monitor \"%s,%dx%d@%.2f,%dx%d,%.2f",
-			m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale)
+		if m.IsMirrored && m.MirrorSource != "" {
+			// Mirror syntax: monitor=NAME,resolution,position,scale,mirror,SOURCE_MONITOR
+			cmd = fmt.Sprintf("hyprctl keyword monitor \"%s,%dx%d@%.2f,%dx%d,%.2f,mirror,%s\"",
+				m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale, m.MirrorSource)
+		} else {
+			// Build base command for regular monitor
+			cmd = fmt.Sprintf("hyprctl keyword monitor \"%s,%dx%d@%.2f,%dx%d,%.2f",
+				m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale)
 
-		// Add advanced settings
-		if m.BitDepth == 10 {
-			cmd += ",bitdepth,10"
-		}
-
-		if m.ColorMode != "" && m.ColorMode != "srgb" {
-			cmd += fmt.Sprintf(",cm,%s", m.ColorMode)
-		}
-
-		// SDR settings only apply when in HDR mode
-		if m.ColorMode == "hdr" || m.ColorMode == "hdredid" {
-			if m.SDRBrightness != 0 && m.SDRBrightness != 1.0 {
-				cmd += fmt.Sprintf(",sdrbrightness,%.2f", m.SDRBrightness)
+			// Add advanced settings (only for non-mirrored monitors)
+			if m.BitDepth == 10 {
+				cmd += ",bitdepth,10"
 			}
-			if m.SDRSaturation != 0 && m.SDRSaturation != 1.0 {
-				cmd += fmt.Sprintf(",sdrsaturation,%.2f", m.SDRSaturation)
+
+			if m.ColorMode != "" && m.ColorMode != "srgb" {
+				cmd += fmt.Sprintf(",cm,%s", m.ColorMode)
 			}
-		}
 
-		if m.VRR > 0 {
-			cmd += fmt.Sprintf(",vrr,%d", m.VRR)
-		}
+			// SDR settings only apply when in HDR mode
+			if m.ColorMode == "hdr" || m.ColorMode == "hdredid" {
+				if m.SDRBrightness != 0 && m.SDRBrightness != 1.0 {
+					cmd += fmt.Sprintf(",sdrbrightness,%.2f", m.SDRBrightness)
+				}
+				if m.SDRSaturation != 0 && m.SDRSaturation != 1.0 {
+					cmd += fmt.Sprintf(",sdrsaturation,%.2f", m.SDRSaturation)
+				}
+			}
 
-		if m.Transform > 0 {
-			cmd += fmt.Sprintf(",transform,%d", m.Transform)
-		}
+			if m.VRR > 0 {
+				cmd += fmt.Sprintf(",vrr,%d", m.VRR)
+			}
 
-		cmd += "\""
+			if m.Transform > 0 {
+				cmd += fmt.Sprintf(",transform,%d", m.Transform)
+			}
+
+			cmd += "\""
+		}
 	} else {
 		cmd = fmt.Sprintf("hyprctl keyword monitor \"%s,disable\"", m.Name)
 	}
@@ -205,6 +237,48 @@ func getConfigPath() string {
 	}
 
 	return filepath.Join(home, ".config", "hypr", "hyprland.conf")
+}
+
+// generateMonitorLine creates the monitor configuration line for a monitor
+func generateMonitorLine(m Monitor) string {
+	if !m.Active {
+		return fmt.Sprintf("monitor=%s,disable", m.Name)
+	}
+
+	var monLine string
+	if m.IsMirrored && m.MirrorSource != "" {
+		// Mirror syntax: monitor=NAME,resolution,position,scale,mirror,SOURCE_MONITOR
+		monLine = fmt.Sprintf("monitor=%s,%dx%d@%.2f,%dx%d,%.2f,mirror,%s",
+			m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale, m.MirrorSource)
+	} else {
+		// Regular monitor configuration
+		monLine = fmt.Sprintf("monitor=%s,%dx%d@%.2f,%dx%d,%.2f",
+			m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale)
+
+		// Add advanced settings (only for non-mirrored monitors)
+		if m.BitDepth == 10 {
+			monLine += ",bitdepth,10"
+		}
+		if m.ColorMode != "" && m.ColorMode != "srgb" {
+			monLine += fmt.Sprintf(",cm,%s", m.ColorMode)
+		}
+		if m.ColorMode == "hdr" || m.ColorMode == "hdredid" {
+			if m.SDRBrightness != 0 && m.SDRBrightness != 1.0 {
+				monLine += fmt.Sprintf(",sdrbrightness,%.2f", m.SDRBrightness)
+			}
+			if m.SDRSaturation != 0 && m.SDRSaturation != 1.0 {
+				monLine += fmt.Sprintf(",sdrsaturation,%.2f", m.SDRSaturation)
+			}
+		}
+		if m.VRR > 0 {
+			monLine += fmt.Sprintf(",vrr,%d", m.VRR)
+		}
+		if m.Transform > 0 {
+			monLine += fmt.Sprintf(",transform,%d", m.Transform)
+		}
+	}
+
+	return monLine
 }
 
 func writeConfig(monitors []Monitor) error {
@@ -235,36 +309,7 @@ func writeConfig(monitors []Monitor) error {
 		if strings.HasPrefix(trimmed, "monitor=") || strings.HasPrefix(trimmed, "monitor ") {
 			if !monitorLinesWritten {
 				for _, m := range monitors {
-					var monLine string
-					if m.Active {
-						monLine = fmt.Sprintf("monitor=%s,%dx%d@%.2f,%dx%d,%.2f",
-							m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale)
-
-						// Add advanced settings
-						if m.BitDepth == 10 {
-							monLine += ",bitdepth,10"
-						}
-						if m.ColorMode != "" && m.ColorMode != "srgb" {
-							monLine += fmt.Sprintf(",cm,%s", m.ColorMode)
-						}
-						if m.ColorMode == "hdr" || m.ColorMode == "hdredid" {
-							if m.SDRBrightness != 0 && m.SDRBrightness != 1.0 {
-								monLine += fmt.Sprintf(",sdrbrightness,%.2f", m.SDRBrightness)
-							}
-							if m.SDRSaturation != 0 && m.SDRSaturation != 1.0 {
-								monLine += fmt.Sprintf(",sdrsaturation,%.2f", m.SDRSaturation)
-							}
-						}
-						if m.VRR > 0 {
-							monLine += fmt.Sprintf(",vrr,%d", m.VRR)
-						}
-						if m.Transform > 0 {
-							monLine += fmt.Sprintf(",transform,%d", m.Transform)
-						}
-					} else {
-						monLine = fmt.Sprintf("monitor=%s,disable", m.Name)
-					}
-					newLines = append(newLines, monLine)
+					newLines = append(newLines, generateMonitorLine(m))
 				}
 				monitorLinesWritten = true
 			}
@@ -284,36 +329,7 @@ func writeConfig(monitors []Monitor) error {
 	if !monitorLinesWritten {
 		newLines = append(newLines, "")
 		for _, m := range monitors {
-			var monLine string
-			if m.Active {
-				monLine = fmt.Sprintf("monitor=%s,%dx%d@%.2f,%dx%d,%.2f",
-					m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale)
-
-				// Add advanced settings
-				if m.BitDepth == 10 {
-					monLine += ",bitdepth,10"
-				}
-				if m.ColorMode != "" && m.ColorMode != "srgb" {
-					monLine += fmt.Sprintf(",cm,%s", m.ColorMode)
-				}
-				if m.ColorMode == "hdr" || m.ColorMode == "hdredid" {
-					if m.SDRBrightness != 0 && m.SDRBrightness != 1.0 {
-						monLine += fmt.Sprintf(",sdrbrightness,%.2f", m.SDRBrightness)
-					}
-					if m.SDRSaturation != 0 && m.SDRSaturation != 1.0 {
-						monLine += fmt.Sprintf(",sdrsaturation,%.2f", m.SDRSaturation)
-					}
-				}
-				if m.VRR > 0 {
-					monLine += fmt.Sprintf(",vrr,%d", m.VRR)
-				}
-				if m.Transform > 0 {
-					monLine += fmt.Sprintf(",transform,%d", m.Transform)
-				}
-			} else {
-				monLine = fmt.Sprintf("monitor=%s,disable", m.Name)
-			}
-			newLines = append(newLines, monLine)
+			newLines = append(newLines, generateMonitorLine(m))
 		}
 	}
 

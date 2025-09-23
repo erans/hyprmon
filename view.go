@@ -62,6 +62,11 @@ func (m model) View() string {
 		return m.ModePicker.View()
 	}
 
+	// Show mirror picker if active
+	if m.ShowMirrorPicker {
+		return m.MirrorPicker.View()
+	}
+
 	// Show advanced settings dialog if active
 	if m.ShowAdvancedSettings {
 		return m.AdvancedSettings.View()
@@ -145,6 +150,8 @@ func (m model) renderHelp() string {
 		{"G", "Cycle grid size (1, 8, 16, 32, 64 px)"},
 		{"L", "Cycle snap mode (Off, Edges, Centers, Both)"},
 		{"R", "Open scale adjustment dialog"},
+		{"F", "Open mode selection dialog"},
+		{"M", "Open mirror configuration dialog"},
 		{"C/D", "Open advanced display settings"},
 		{"A", "Apply the changes right now (doesn't persist)"},
 		{"S", "Save current configuration to Hyprland. Will persist restarts"},
@@ -304,6 +311,9 @@ func (m model) renderDesktop() string {
 		m.renderMonitor(desktop, mon, i == m.Selected)
 	}
 
+	// Draw mirror connection lines
+	m.renderMirrorConnections(desktop)
+
 	var lines []string
 	for _, row := range desktop {
 		lines = append(lines, string(row))
@@ -390,10 +400,21 @@ func (m model) renderMonitor(desktop [][]rune, mon Monitor, selected bool) {
 		}
 	}
 
-	// Add monitor name with [ON]/[OFF] status
+	// Add monitor name with [ON]/[OFF] and mirror status
 	statusLabel := "[ON]"
 	if !mon.Active {
 		statusLabel = "[OFF]"
+	}
+
+	// Add mirror indicators
+	if mon.IsMirrored && mon.MirrorSource != "" {
+		statusLabel += fmt.Sprintf(" →%s", mon.MirrorSource)
+	} else if len(mon.MirrorTargets) > 0 {
+		if len(mon.MirrorTargets) == 1 {
+			statusLabel += fmt.Sprintf(" ←%s", mon.MirrorTargets[0])
+		} else {
+			statusLabel += fmt.Sprintf(" ←%d", len(mon.MirrorTargets))
+		}
 	}
 	nameLabel := fmt.Sprintf("%s %s", mon.Name, statusLabel)
 	if len(nameLabel) > tx2-tx1-2 {
@@ -469,6 +490,91 @@ func (m model) renderMonitor(desktop [][]rune, mon Monitor, selected bool) {
 	}
 }
 
+func (m model) renderMirrorConnections(desktop [][]rune) {
+	for _, mon := range m.Monitors {
+		if mon.IsMirrored && mon.MirrorSource != "" {
+			// Find the source monitor
+			for _, sourceMon := range m.Monitors {
+				if sourceMon.Name == mon.MirrorSource {
+					m.drawMirrorLine(desktop, sourceMon, mon)
+					break
+				}
+			}
+		}
+	}
+}
+
+func (m model) drawMirrorLine(desktop [][]rune, source, target Monitor) {
+	// Calculate center points of both monitors
+	sourceWidth, sourceHeight := m.getEffectiveDimensions(source)
+	targetWidth, targetHeight := m.getEffectiveDimensions(target)
+
+	sourceCenterX := source.X + sourceWidth/2
+	sourceCenterY := source.Y + sourceHeight/2
+	targetCenterX := target.X + targetWidth/2
+	targetCenterY := target.Y + targetHeight/2
+
+	// Convert to terminal coordinates
+	sx, sy := m.worldToTerm(sourceCenterX, sourceCenterY)
+	tx, ty := m.worldToTerm(targetCenterX, targetCenterY)
+
+	// Draw a simple dotted line between centers
+	m.drawDottedLine(desktop, sx, sy, tx, ty)
+}
+
+func (m model) drawDottedLine(desktop [][]rune, x1, y1, x2, y2 int) {
+	// Simple Bresenham-like algorithm for dotted line
+	dx := x2 - x1
+	dy := y2 - y1
+	if dx < 0 {
+		dx = -dx
+	}
+	if dy < 0 {
+		dy = -dy
+	}
+
+	var stepX, stepY int
+	if x1 < x2 {
+		stepX = 1
+	} else {
+		stepX = -1
+	}
+	if y1 < y2 {
+		stepY = 1
+	} else {
+		stepY = -1
+	}
+
+	err := dx - dy
+	x, y := x1, y1
+	step := 0
+
+	for {
+		// Only draw every other step for dotted effect
+		if step%2 == 0 && y >= 0 && y < len(desktop) && x >= 0 && x < len(desktop[0]) {
+			// Don't overwrite monitor borders/content
+			if desktop[y][x] == ' ' {
+				desktop[y][x] = '·'
+			}
+		}
+
+		if x == x2 && y == y2 {
+			break
+		}
+
+		e2 := 2 * err
+		if e2 > -dy {
+			err -= dy
+			x += stepX
+		}
+		if e2 < dx {
+			err += dx
+			y += stepY
+		}
+		step++
+	}
+}
+
 func (m model) renderGuide(desktop [][]rune, guide guide) {
 	switch guide.Type {
 	case "vertical":
@@ -521,6 +627,8 @@ func (m model) renderFooter() string {
 		{"G grid", "G grid", "G", 2},
 		{"L snap", "L snap", "L", 2},
 		{"R scale", "R scale", "R", 1},
+		{"F mode", "F mode", "F", 2},
+		{"M mirror", "M mirror", "M", 2},
 		{"C advanced", "C adv", "C", 1},
 		{"A apply", "A apply", "A", 2},
 		{"S save", "S save", "S", 2},
