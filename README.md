@@ -12,7 +12,8 @@ HyprMon is a TUI (Terminal User Interface) tool for configuring monitors on Arch
 - **Resolution & Refresh Rate**: Choose from all available display modes (1080p@144Hz, 4K@60Hz, etc.)
 - **Advanced Display Settings**: Color depth (8/10-bit), color management (sRGB/Wide/HDR), VRR, rotation/transform
 - **HDR Support**: HDR color mode with SDR brightness and saturation controls
-- **Visual Indicators**: Monitor boxes show HDR, 10-bit, VRR, and transform status
+- **Monitor Mirroring**: Mirror one monitor to another with visual feedback and circular dependency prevention
+- **Visual Indicators**: Monitor boxes show HDR, 10-bit, VRR, transform status, and mirror relationships
 - **Live Apply**: Instantly apply changes to Hyprland or save them to configuration
 - **Safe Rollback**: Revert to previous configuration if something goes wrong
 - **Automatic Backups**: Creates timestamped backups before modifying config files
@@ -78,6 +79,7 @@ hyprmon profiles
 | `[` / `]` | Decrease/Increase scale by 0.05 |
 | `Enter` or `Space` | Toggle monitor active/inactive |
 | `C` or `D` | Open advanced display settings dialog |
+| `M` | Open monitor mirroring configuration |
 | `A` | Apply changes live to Hyprland |
 | `S` | Save changes to configuration file |
 | `P` | Save current layout as named profile |
@@ -100,6 +102,7 @@ hyprmon profiles
 - **Double border**: Currently selected monitor
 - **Alignment guides**: Appear when monitors align
 - **Status badges**: HDR, 10-bit, VRR, and rotation indicators on monitor boxes
+- **Mirror indicators**: →source (mirroring from) and ←target (mirroring to) with dotted lines
 
 ## Advanced Display Settings
 
@@ -122,6 +125,28 @@ Press `C` or `D` in the main UI to open the advanced display settings dialog for
 | `←→` | Adjust slider values (SDR brightness/saturation) |
 | `Enter` | Apply changes and close dialog |
 | `Esc` | Cancel changes and close dialog |
+
+## Monitor Mirroring
+
+Press `M` in the main UI to configure monitor mirroring for the selected monitor. This allows you to:
+
+- **Mirror to another monitor**: Show the same content on both displays
+- **Visual feedback**: See mirror relationships with directional indicators and dotted lines
+- **Circular dependency prevention**: Automatically prevents invalid mirror chains (A→B→C→A)
+- **Real-time validation**: Immediate feedback if a mirror configuration would be invalid
+
+### Mirror Configuration Controls
+| Key | Action |
+|-----|--------|
+| `↑↓` | Navigate between available source monitors |
+| `Enter` | Set selected monitor as mirror source |
+| `D` | Disable mirroring (no source) |
+| `Esc` | Cancel and close mirror picker |
+
+### Mirror Troubleshooting
+- **Invalid mirror chains**: The system prevents circular dependencies where monitors mirror each other in a loop
+- **Source not available**: Ensure the source monitor is active and not already mirroring another display
+- **Performance**: Mirroring may impact performance depending on resolution and refresh rate differences
 
 ## Profiles
 
@@ -211,6 +236,7 @@ Before any configuration changes, HyprMon creates a backup:
 - [x] Advanced display settings (color depth, HDR, VRR, rotation)
 - [x] DPI-aware positioning (accounts for monitor scale in layout)
 - [x] Resolution and refresh rate picker
+- [x] Monitor mirroring with circular dependency prevention
 - [ ] Alignment menu (distribute, same size, etc.)
 - [ ] Auto-switching profiles on monitor hotplug
 
