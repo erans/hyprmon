@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +11,87 @@ import (
 	"strings"
 	"time"
 )
+
+const (
+	// hyprctlTimeout is the timeout for hyprctl commands
+	hyprctlTimeout = 5 * time.Second
+
+	// File permissions
+	configFileMode  = 0600 // rw------- (user-only access for config files)
+	backupFileMode  = 0600 // rw------- (user-only access for backups)
+	profileDirMode  = 0700 // rwx------ (user-only access for profile directory)
+	profileFileMode = 0600 // rw------- (user-only access for profile files)
+
+	// Default world dimensions
+	defaultWorldWidth  = 3840
+	defaultWorldHeight = 2160
+	defaultWorldScale  = 1.0
+
+	// World bounds padding
+	worldPaddingPx = 500
+
+	// UI layout constants
+	desktopBorderMargin = 3  // Border (2) + margin (1)
+	desktopFooterHeight = 10 // Height reserved for footer
+)
+
+// isValidMonitorName validates that a monitor name is safe to use in commands
+func isValidMonitorName(name string) bool {
+	if name == "" {
+		return false
+	}
+	// Monitor names should only contain alphanumeric, dash, underscore, and dot
+	for _, r := range name {
+		isLower := r >= 'a' && r <= 'z'
+		isUpper := r >= 'A' && r <= 'Z'
+		isDigit := r >= '0' && r <= '9'
+		isSpecial := r == '-' || r == '_' || r == '.'
+		if !isLower && !isUpper && !isDigit && !isSpecial {
+			return false
+		}
+	}
+	return true
+}
+
+// isValidColorMode validates that a color mode is from the allowed set
+func isValidColorMode(mode string) bool {
+	validModes := map[string]bool{
+		"auto":    true,
+		"srgb":    true,
+		"wide":    true,
+		"edid":    true,
+		"hdr":     true,
+		"hdredid": true,
+		"":        true, // empty is valid (default)
+	}
+	return validModes[mode]
+}
+
+// execHyprctl executes a hyprctl command with the given arguments and returns the output
+func execHyprctl(args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), hyprctlTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "hyprctl", args...)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute hyprctl %v: %w", args, err)
+	}
+	return output, nil
+}
+
+// execHyprctlJSON executes a hyprctl command and unmarshals the JSON output into the provided result
+func execHyprctlJSON(result interface{}, args ...string) error {
+	output, err := execHyprctl(args...)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(output, result); err != nil {
+		return fmt.Errorf("failed to parse JSON from hyprctl %v: %w", args, err)
+	}
+	return nil
+}
 
 type hyprMonitor struct {
 	ID              int     `json:"id"`
@@ -50,15 +132,9 @@ type hyprWorkspace struct {
 }
 
 func readMonitors() ([]Monitor, error) {
-	cmd := exec.Command("hyprctl", "monitors", "all", "-j")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute hyprctl: %w", err)
-	}
-
 	var hyprMonitors []hyprMonitor
-	if err := json.Unmarshal(output, &hyprMonitors); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	if err := execHyprctlJSON(&hyprMonitors, "monitors", "all", "-j"); err != nil {
+		return nil, err
 	}
 
 	monitors := make([]Monitor, 0, len(hyprMonitors))
@@ -115,15 +191,9 @@ func readMonitors() ([]Monitor, error) {
 
 // getAvailableModes returns the available modes for a specific monitor
 func getAvailableModes(monitorName string) ([]string, error) {
-	cmd := exec.Command("hyprctl", "monitors", "all", "-j")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute hyprctl: %w", err)
-	}
-
 	var hyprMonitors []hyprMonitor
-	if err := json.Unmarshal(output, &hyprMonitors); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	if err := execHyprctlJSON(&hyprMonitors, "monitors", "all", "-j"); err != nil {
+		return nil, err
 	}
 
 	for _, hm := range hyprMonitors {
@@ -170,9 +240,23 @@ func parseMode(modeStr string) *Mode {
 }
 
 func applyMonitor(m Monitor) error {
+	// Validate monitor name to prevent command injection
+	if !isValidMonitorName(m.Name) {
+		return fmt.Errorf("invalid monitor name: %s", m.Name)
+	}
+
+	// Validate color mode if set
+	if !isValidColorMode(m.ColorMode) {
+		return fmt.Errorf("invalid color mode: %s", m.ColorMode)
+	}
+
 	var cmd string
 	if m.Active {
 		if m.IsMirrored && m.MirrorSource != "" {
+			// Validate mirror source name
+			if !isValidMonitorName(m.MirrorSource) {
+				return fmt.Errorf("invalid mirror source name: %s", m.MirrorSource)
+			}
 			// Mirror syntax: monitor=NAME,resolution,position,scale,mirror,SOURCE_MONITOR
 			cmd = fmt.Sprintf("hyprctl keyword monitor \"%s,%dx%d@%.2f,%dx%d,%.2f,mirror,%s\"",
 				m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale, m.MirrorSource)
@@ -214,7 +298,10 @@ func applyMonitor(m Monitor) error {
 		cmd = fmt.Sprintf("hyprctl keyword monitor \"%s,disable\"", m.Name)
 	}
 
-	return exec.Command("sh", "-c", cmd).Run()
+	ctx, cancel := context.WithTimeout(context.Background(), hyprctlTimeout)
+	defer cancel()
+
+	return exec.CommandContext(ctx, "sh", "-c", cmd).Run()
 }
 
 func applyMonitors(monitors []Monitor) error {
@@ -228,7 +315,16 @@ func applyMonitors(monitors []Monitor) error {
 
 func getConfigPath() string {
 	if envPath := os.Getenv("HYPRLAND_CONFIG"); envPath != "" {
-		return envPath
+		// Validate that the path is absolute and clean to prevent path traversal
+		cleanPath := filepath.Clean(envPath)
+		if !filepath.IsAbs(cleanPath) {
+			return ""
+		}
+		// Ensure the path doesn't contain directory traversal attempts
+		if strings.Contains(envPath, "..") {
+			return ""
+		}
+		return cleanPath
 	}
 
 	home, err := os.UserHomeDir()
@@ -241,12 +337,21 @@ func getConfigPath() string {
 
 // generateMonitorLine creates the monitor configuration line for a monitor
 func generateMonitorLine(m Monitor) string {
+	// Validate monitor name (defensive check)
+	if !isValidMonitorName(m.Name) {
+		return fmt.Sprintf("# Invalid monitor name: %s", m.Name)
+	}
+
 	if !m.Active {
 		return fmt.Sprintf("monitor=%s,disable", m.Name)
 	}
 
 	var monLine string
 	if m.IsMirrored && m.MirrorSource != "" {
+		// Validate mirror source name (defensive check)
+		if !isValidMonitorName(m.MirrorSource) {
+			return fmt.Sprintf("# Invalid mirror source: %s", m.MirrorSource)
+		}
 		// Mirror syntax: monitor=NAME,resolution,position,scale,mirror,SOURCE_MONITOR
 		monLine = fmt.Sprintf("monitor=%s,%dx%d@%.2f,%dx%d,%.2f,mirror,%s",
 			m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale, m.MirrorSource)
@@ -260,7 +365,10 @@ func generateMonitorLine(m Monitor) string {
 			monLine += ",bitdepth,10"
 		}
 		if m.ColorMode != "" && m.ColorMode != "srgb" {
-			monLine += fmt.Sprintf(",cm,%s", m.ColorMode)
+			// Validate color mode (defensive check)
+			if isValidColorMode(m.ColorMode) {
+				monLine += fmt.Sprintf(",cm,%s", m.ColorMode)
+			}
 		}
 		if m.ColorMode == "hdr" || m.ColorMode == "hdredid" {
 			if m.SDRBrightness != 0 && m.SDRBrightness != 1.0 {
@@ -294,7 +402,7 @@ func writeConfig(monitors []Monitor) error {
 		return fmt.Errorf("failed to read config: %w", err)
 	}
 
-	if err := os.WriteFile(backupPath, input, 0644); err != nil {
+	if err := os.WriteFile(backupPath, input, backupFileMode); err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
@@ -333,22 +441,37 @@ func writeConfig(monitors []Monitor) error {
 		}
 	}
 
-	// Get file info to preserve permissions
-	fileInfo, err := os.Stat(configPath)
+	// Open the file once to avoid TOCTOU race condition
+	// This also preserves symlinks by writing through them
+	file, err := os.OpenFile(configPath, os.O_WRONLY|os.O_TRUNC, 0)
 	if err != nil {
-		return fmt.Errorf("failed to get file info: %w", err)
+		return fmt.Errorf("failed to open config for writing: %w", err)
+	}
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close config: %w", closeErr)
+		}
+	}()
+
+	// Write the new content
+	content := []byte(strings.Join(newLines, "\n"))
+	if _, err = file.Write(content); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
 	}
 
-	// Write directly to the config file to preserve symlinks
-	if err := os.WriteFile(configPath, []byte(strings.Join(newLines, "\n")), fileInfo.Mode()); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
+	// Ensure data is written to disk
+	if err = file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync config: %w", err)
 	}
 
 	return nil
 }
 
 func reloadConfig() error {
-	return exec.Command("hyprctl", "reload").Run()
+	ctx, cancel := context.WithTimeout(context.Background(), hyprctlTimeout)
+	defer cancel()
+
+	return exec.CommandContext(ctx, "hyprctl", "reload").Run()
 }
 
 var previousMonitors []Monitor
@@ -366,30 +489,17 @@ func rollback() error {
 }
 
 func readWorkspaces() ([]hyprWorkspace, error) {
-	cmd := exec.Command("hyprctl", "workspaces", "-j")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute hyprctl workspaces: %w", err)
-	}
-
 	var workspaces []hyprWorkspace
-	if err := json.Unmarshal(output, &workspaces); err != nil {
-		return nil, fmt.Errorf("failed to parse workspaces JSON: %w", err)
+	if err := execHyprctlJSON(&workspaces, "workspaces", "-j"); err != nil {
+		return nil, err
 	}
-
 	return workspaces, nil
 }
 
 func getCurrentMonitorNames() ([]string, error) {
-	cmd := exec.Command("hyprctl", "monitors", "-j")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute hyprctl monitors: %w", err)
-	}
-
 	var hyprMonitors []hyprMonitor
-	if err := json.Unmarshal(output, &hyprMonitors); err != nil {
-		return nil, fmt.Errorf("failed to parse monitors JSON: %w", err)
+	if err := execHyprctlJSON(&hyprMonitors, "monitors", "-j"); err != nil {
+		return nil, err
 	}
 
 	var names []string
@@ -415,7 +525,9 @@ func migrateOrphanedWorkspaces(previousMonitorNames, currentMonitorNames []strin
 			// Move workspace if it's not already on the target monitor
 			if workspace.Monitor != targetMonitor {
 				cmd := fmt.Sprintf("hyprctl dispatch moveworkspacetomonitor %d %s", workspace.ID, targetMonitor)
-				if err := exec.Command("sh", "-c", cmd).Run(); err != nil {
+				ctx, cancel := context.WithTimeout(context.Background(), hyprctlTimeout)
+				defer cancel()
+				if err := exec.CommandContext(ctx, "sh", "-c", cmd).Run(); err != nil {
 					return fmt.Errorf("failed to migrate workspace %d to monitor %s: %w", workspace.ID, targetMonitor, err)
 				}
 			}
@@ -438,7 +550,9 @@ func migrateOrphanedWorkspaces(previousMonitorNames, currentMonitorNames []strin
 		for _, removedMonitor := range removedMonitors {
 			if workspace.Monitor == removedMonitor {
 				cmd := fmt.Sprintf("hyprctl dispatch moveworkspacetomonitor %d current", workspace.ID)
-				if err := exec.Command("sh", "-c", cmd).Run(); err != nil {
+				ctx, cancel := context.WithTimeout(context.Background(), hyprctlTimeout)
+				defer cancel()
+				if err := exec.CommandContext(ctx, "sh", "-c", cmd).Run(); err != nil {
 					return fmt.Errorf("failed to migrate workspace %d: %w", workspace.ID, err)
 				}
 			}
