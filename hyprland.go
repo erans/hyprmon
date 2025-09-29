@@ -333,13 +333,15 @@ func writeConfig(monitors []Monitor) error {
 		}
 	}
 
-	tempPath := configPath + ".tmp"
-	if err := os.WriteFile(tempPath, []byte(strings.Join(newLines, "\n")), 0644); err != nil {
-		return fmt.Errorf("failed to write temp file: %w", err)
+	// Get file info to preserve permissions
+	fileInfo, err := os.Stat(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to get file info: %w", err)
 	}
 
-	if err := os.Rename(tempPath, configPath); err != nil {
-		return fmt.Errorf("failed to replace config: %w", err)
+	// Write directly to the config file to preserve symlinks
+	if err := os.WriteFile(configPath, []byte(strings.Join(newLines, "\n")), fileInfo.Mode()); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
 	}
 
 	return nil
