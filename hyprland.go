@@ -42,8 +42,11 @@ func isValidMonitorName(name string) bool {
 	}
 	// Monitor names should only contain alphanumeric, dash, underscore, and dot
 	for _, r := range name {
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
-			(r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.') {
+		isLower := r >= 'a' && r <= 'z'
+		isUpper := r >= 'A' && r <= 'Z'
+		isDigit := r >= '0' && r <= '9'
+		isSpecial := r == '-' || r == '_' || r == '.'
+		if !isLower && !isUpper && !isDigit && !isSpecial {
 			return false
 		}
 	}
@@ -53,13 +56,13 @@ func isValidMonitorName(name string) bool {
 // isValidColorMode validates that a color mode is from the allowed set
 func isValidColorMode(mode string) bool {
 	validModes := map[string]bool{
-		"auto":     true,
-		"srgb":     true,
-		"wide":     true,
-		"edid":     true,
-		"hdr":      true,
-		"hdredid":  true,
-		"":         true, // empty is valid (default)
+		"auto":    true,
+		"srgb":    true,
+		"wide":    true,
+		"edid":    true,
+		"hdr":     true,
+		"hdredid": true,
+		"":        true, // empty is valid (default)
 	}
 	return validModes[mode]
 }
@@ -444,16 +447,20 @@ func writeConfig(monitors []Monitor) error {
 	if err != nil {
 		return fmt.Errorf("failed to open config for writing: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close config: %w", closeErr)
+		}
+	}()
 
 	// Write the new content
 	content := []byte(strings.Join(newLines, "\n"))
-	if _, err := file.Write(content); err != nil {
+	if _, err = file.Write(content); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
 
 	// Ensure data is written to disk
-	if err := file.Sync(); err != nil {
+	if err = file.Sync(); err != nil {
 		return fmt.Errorf("failed to sync config: %w", err)
 	}
 
