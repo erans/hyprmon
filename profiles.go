@@ -42,7 +42,7 @@ func ensureProfilesDir() error {
 	if dir == "" {
 		return fmt.Errorf("could not determine profiles directory")
 	}
-	return os.MkdirAll(dir, 0755)
+	return os.MkdirAll(dir, profileDirMode)
 }
 
 func saveProfile(name string, monitors []Monitor) error {
@@ -68,10 +68,13 @@ func saveProfile(name string, monitors []Monitor) error {
 
 	data, err := json.MarshalIndent(profile, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal profile: %w", err)
 	}
 
-	return os.WriteFile(filename, data, 0644)
+	if err := os.WriteFile(filename, data, profileFileMode); err != nil {
+		return fmt.Errorf("failed to write profile file: %w", err)
+	}
+	return nil
 }
 
 func loadProfile(name string) (*Profile, error) {
@@ -79,12 +82,12 @@ func loadProfile(name string) (*Profile, error) {
 
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read profile file: %w", err)
 	}
 
 	var profile Profile
 	if err := json.Unmarshal(data, &profile); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal profile: %w", err)
 	}
 
 	return &profile, nil
@@ -101,7 +104,7 @@ func listProfiles() ([]string, error) {
 		if os.IsNotExist(err) {
 			return []string{}, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed to read profiles directory: %w", err)
 	}
 
 	var profiles []string
@@ -139,12 +142,12 @@ func loadProfileOrder() ([]string, error) {
 		if os.IsNotExist(err) {
 			return []string{}, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed to read profile order file: %w", err)
 	}
 
 	var order []string
 	if err := json.Unmarshal(data, &order); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal profile order: %w", err)
 	}
 
 	return order, nil
@@ -157,15 +160,18 @@ func saveProfileOrder(order []string) error {
 	}
 
 	if err := ensureProfilesDir(); err != nil {
-		return err
+		return fmt.Errorf("failed to ensure profiles directory: %w", err)
 	}
 
 	data, err := json.MarshalIndent(order, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal profile order: %w", err)
 	}
 
-	return os.WriteFile(filename, data, 0644)
+	if err := os.WriteFile(filename, data, profileFileMode); err != nil {
+		return fmt.Errorf("failed to write profile order: %w", err)
+	}
+	return nil
 }
 
 func renameProfile(oldName, newName string) error {
@@ -182,7 +188,7 @@ func renameProfile(oldName, newName string) error {
 	// Load the old profile
 	profile, err := loadProfile(oldName)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load old profile: %w", err)
 	}
 
 	// Update the name
@@ -190,11 +196,14 @@ func renameProfile(oldName, newName string) error {
 
 	// Save with new name
 	if err := saveProfile(newName, profile.Monitors); err != nil {
-		return err
+		return fmt.Errorf("failed to save renamed profile: %w", err)
 	}
 
 	// Delete old file
-	return deleteProfile(oldName)
+	if err := deleteProfile(oldName); err != nil {
+		return fmt.Errorf("failed to delete old profile: %w", err)
+	}
+	return nil
 }
 
 func applyProfile(name string) error {

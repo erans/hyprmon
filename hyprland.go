@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +11,55 @@ import (
 	"strings"
 	"time"
 )
+
+const (
+	// hyprctlTimeout is the timeout for hyprctl commands
+	hyprctlTimeout = 5 * time.Second
+
+	// File permissions
+	configFileMode  = 0644 // rw-r--r--
+	backupFileMode  = 0644 // rw-r--r--
+	profileDirMode  = 0755 // rwxr-xr-x
+	profileFileMode = 0644 // rw-r--r--
+
+	// Default world dimensions
+	defaultWorldWidth  = 3840
+	defaultWorldHeight = 2160
+	defaultWorldScale  = 1.0
+
+	// World bounds padding
+	worldPaddingPx = 500
+
+	// UI layout constants
+	desktopBorderMargin = 3  // Border (2) + margin (1)
+	desktopFooterHeight = 10 // Height reserved for footer
+)
+
+// execHyprctl executes a hyprctl command with the given arguments and returns the output
+func execHyprctl(args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), hyprctlTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "hyprctl", args...)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute hyprctl %v: %w", args, err)
+	}
+	return output, nil
+}
+
+// execHyprctlJSON executes a hyprctl command and unmarshals the JSON output into the provided result
+func execHyprctlJSON(result interface{}, args ...string) error {
+	output, err := execHyprctl(args...)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(output, result); err != nil {
+		return fmt.Errorf("failed to parse JSON from hyprctl %v: %w", args, err)
+	}
+	return nil
+}
 
 type hyprMonitor struct {
 	ID              int     `json:"id"`
@@ -50,15 +100,9 @@ type hyprWorkspace struct {
 }
 
 func readMonitors() ([]Monitor, error) {
-	cmd := exec.Command("hyprctl", "monitors", "all", "-j")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute hyprctl: %w", err)
-	}
-
 	var hyprMonitors []hyprMonitor
-	if err := json.Unmarshal(output, &hyprMonitors); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	if err := execHyprctlJSON(&hyprMonitors, "monitors", "all", "-j"); err != nil {
+		return nil, err
 	}
 
 	monitors := make([]Monitor, 0, len(hyprMonitors))
@@ -115,15 +159,9 @@ func readMonitors() ([]Monitor, error) {
 
 // getAvailableModes returns the available modes for a specific monitor
 func getAvailableModes(monitorName string) ([]string, error) {
-	cmd := exec.Command("hyprctl", "monitors", "all", "-j")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute hyprctl: %w", err)
-	}
-
 	var hyprMonitors []hyprMonitor
-	if err := json.Unmarshal(output, &hyprMonitors); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	if err := execHyprctlJSON(&hyprMonitors, "monitors", "all", "-j"); err != nil {
+		return nil, err
 	}
 
 	for _, hm := range hyprMonitors {
@@ -214,7 +252,10 @@ func applyMonitor(m Monitor) error {
 		cmd = fmt.Sprintf("hyprctl keyword monitor \"%s,disable\"", m.Name)
 	}
 
-	return exec.Command("sh", "-c", cmd).Run()
+	ctx, cancel := context.WithTimeout(context.Background(), hyprctlTimeout)
+	defer cancel()
+
+	return exec.CommandContext(ctx, "sh", "-c", cmd).Run()
 }
 
 func applyMonitors(monitors []Monitor) error {
@@ -294,7 +335,7 @@ func writeConfig(monitors []Monitor) error {
 		return fmt.Errorf("failed to read config: %w", err)
 	}
 
-	if err := os.WriteFile(backupPath, input, 0644); err != nil {
+	if err := os.WriteFile(backupPath, input, backupFileMode); err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
@@ -348,7 +389,10 @@ func writeConfig(monitors []Monitor) error {
 }
 
 func reloadConfig() error {
-	return exec.Command("hyprctl", "reload").Run()
+	ctx, cancel := context.WithTimeout(context.Background(), hyprctlTimeout)
+	defer cancel()
+
+	return exec.CommandContext(ctx, "hyprctl", "reload").Run()
 }
 
 var previousMonitors []Monitor
@@ -366,30 +410,17 @@ func rollback() error {
 }
 
 func readWorkspaces() ([]hyprWorkspace, error) {
-	cmd := exec.Command("hyprctl", "workspaces", "-j")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute hyprctl workspaces: %w", err)
-	}
-
 	var workspaces []hyprWorkspace
-	if err := json.Unmarshal(output, &workspaces); err != nil {
-		return nil, fmt.Errorf("failed to parse workspaces JSON: %w", err)
+	if err := execHyprctlJSON(&workspaces, "workspaces", "-j"); err != nil {
+		return nil, err
 	}
-
 	return workspaces, nil
 }
 
 func getCurrentMonitorNames() ([]string, error) {
-	cmd := exec.Command("hyprctl", "monitors", "-j")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute hyprctl monitors: %w", err)
-	}
-
 	var hyprMonitors []hyprMonitor
-	if err := json.Unmarshal(output, &hyprMonitors); err != nil {
-		return nil, fmt.Errorf("failed to parse monitors JSON: %w", err)
+	if err := execHyprctlJSON(&hyprMonitors, "monitors", "-j"); err != nil {
+		return nil, err
 	}
 
 	var names []string
@@ -415,7 +446,9 @@ func migrateOrphanedWorkspaces(previousMonitorNames, currentMonitorNames []strin
 			// Move workspace if it's not already on the target monitor
 			if workspace.Monitor != targetMonitor {
 				cmd := fmt.Sprintf("hyprctl dispatch moveworkspacetomonitor %d %s", workspace.ID, targetMonitor)
-				if err := exec.Command("sh", "-c", cmd).Run(); err != nil {
+				ctx, cancel := context.WithTimeout(context.Background(), hyprctlTimeout)
+				defer cancel()
+				if err := exec.CommandContext(ctx, "sh", "-c", cmd).Run(); err != nil {
 					return fmt.Errorf("failed to migrate workspace %d to monitor %s: %w", workspace.ID, targetMonitor, err)
 				}
 			}
@@ -438,7 +471,9 @@ func migrateOrphanedWorkspaces(previousMonitorNames, currentMonitorNames []strin
 		for _, removedMonitor := range removedMonitors {
 			if workspace.Monitor == removedMonitor {
 				cmd := fmt.Sprintf("hyprctl dispatch moveworkspacetomonitor %d current", workspace.ID)
-				if err := exec.Command("sh", "-c", cmd).Run(); err != nil {
+				ctx, cancel := context.WithTimeout(context.Background(), hyprctlTimeout)
+				defer cancel()
+				if err := exec.CommandContext(ctx, "sh", "-c", cmd).Run(); err != nil {
 					return fmt.Errorf("failed to migrate workspace %d: %w", workspace.ID, err)
 				}
 			}
