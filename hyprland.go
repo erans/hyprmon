@@ -35,6 +35,35 @@ const (
 	desktopFooterHeight = 10 // Height reserved for footer
 )
 
+// isValidMonitorName validates that a monitor name is safe to use in commands
+func isValidMonitorName(name string) bool {
+	if name == "" {
+		return false
+	}
+	// Monitor names should only contain alphanumeric, dash, underscore, and dot
+	for _, r := range name {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.') {
+			return false
+		}
+	}
+	return true
+}
+
+// isValidColorMode validates that a color mode is from the allowed set
+func isValidColorMode(mode string) bool {
+	validModes := map[string]bool{
+		"auto":     true,
+		"srgb":     true,
+		"wide":     true,
+		"edid":     true,
+		"hdr":      true,
+		"hdredid":  true,
+		"":         true, // empty is valid (default)
+	}
+	return validModes[mode]
+}
+
 // execHyprctl executes a hyprctl command with the given arguments and returns the output
 func execHyprctl(args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), hyprctlTimeout)
@@ -208,9 +237,23 @@ func parseMode(modeStr string) *Mode {
 }
 
 func applyMonitor(m Monitor) error {
+	// Validate monitor name to prevent command injection
+	if !isValidMonitorName(m.Name) {
+		return fmt.Errorf("invalid monitor name: %s", m.Name)
+	}
+
+	// Validate color mode if set
+	if !isValidColorMode(m.ColorMode) {
+		return fmt.Errorf("invalid color mode: %s", m.ColorMode)
+	}
+
 	var cmd string
 	if m.Active {
 		if m.IsMirrored && m.MirrorSource != "" {
+			// Validate mirror source name
+			if !isValidMonitorName(m.MirrorSource) {
+				return fmt.Errorf("invalid mirror source name: %s", m.MirrorSource)
+			}
 			// Mirror syntax: monitor=NAME,resolution,position,scale,mirror,SOURCE_MONITOR
 			cmd = fmt.Sprintf("hyprctl keyword monitor \"%s,%dx%d@%.2f,%dx%d,%.2f,mirror,%s\"",
 				m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale, m.MirrorSource)
@@ -269,7 +312,16 @@ func applyMonitors(monitors []Monitor) error {
 
 func getConfigPath() string {
 	if envPath := os.Getenv("HYPRLAND_CONFIG"); envPath != "" {
-		return envPath
+		// Validate that the path is absolute and clean to prevent path traversal
+		cleanPath := filepath.Clean(envPath)
+		if !filepath.IsAbs(cleanPath) {
+			return ""
+		}
+		// Ensure the path doesn't contain directory traversal attempts
+		if strings.Contains(envPath, "..") {
+			return ""
+		}
+		return cleanPath
 	}
 
 	home, err := os.UserHomeDir()
@@ -282,12 +334,21 @@ func getConfigPath() string {
 
 // generateMonitorLine creates the monitor configuration line for a monitor
 func generateMonitorLine(m Monitor) string {
+	// Validate monitor name (defensive check)
+	if !isValidMonitorName(m.Name) {
+		return fmt.Sprintf("# Invalid monitor name: %s", m.Name)
+	}
+
 	if !m.Active {
 		return fmt.Sprintf("monitor=%s,disable", m.Name)
 	}
 
 	var monLine string
 	if m.IsMirrored && m.MirrorSource != "" {
+		// Validate mirror source name (defensive check)
+		if !isValidMonitorName(m.MirrorSource) {
+			return fmt.Sprintf("# Invalid mirror source: %s", m.MirrorSource)
+		}
 		// Mirror syntax: monitor=NAME,resolution,position,scale,mirror,SOURCE_MONITOR
 		monLine = fmt.Sprintf("monitor=%s,%dx%d@%.2f,%dx%d,%.2f,mirror,%s",
 			m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale, m.MirrorSource)
@@ -301,7 +362,10 @@ func generateMonitorLine(m Monitor) string {
 			monLine += ",bitdepth,10"
 		}
 		if m.ColorMode != "" && m.ColorMode != "srgb" {
-			monLine += fmt.Sprintf(",cm,%s", m.ColorMode)
+			// Validate color mode (defensive check)
+			if isValidColorMode(m.ColorMode) {
+				monLine += fmt.Sprintf(",cm,%s", m.ColorMode)
+			}
 		}
 		if m.ColorMode == "hdr" || m.ColorMode == "hdredid" {
 			if m.SDRBrightness != 0 && m.SDRBrightness != 1.0 {
