@@ -17,10 +17,10 @@ const (
 	hyprctlTimeout = 5 * time.Second
 
 	// File permissions
-	configFileMode  = 0644 // rw-r--r--
-	backupFileMode  = 0644 // rw-r--r--
-	profileDirMode  = 0755 // rwxr-xr-x
-	profileFileMode = 0644 // rw-r--r--
+	configFileMode  = 0600 // rw------- (user-only access for config files)
+	backupFileMode  = 0600 // rw------- (user-only access for backups)
+	profileDirMode  = 0700 // rwx------ (user-only access for profile directory)
+	profileFileMode = 0600 // rw------- (user-only access for profile files)
 
 	// Default world dimensions
 	defaultWorldWidth  = 3840
@@ -374,15 +374,23 @@ func writeConfig(monitors []Monitor) error {
 		}
 	}
 
-	// Get file info to preserve permissions
-	fileInfo, err := os.Stat(configPath)
+	// Open the file once to avoid TOCTOU race condition
+	// This also preserves symlinks by writing through them
+	file, err := os.OpenFile(configPath, os.O_WRONLY|os.O_TRUNC, 0)
 	if err != nil {
-		return fmt.Errorf("failed to get file info: %w", err)
+		return fmt.Errorf("failed to open config for writing: %w", err)
+	}
+	defer file.Close()
+
+	// Write the new content
+	content := []byte(strings.Join(newLines, "\n"))
+	if _, err := file.Write(content); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
 	}
 
-	// Write directly to the config file to preserve symlinks
-	if err := os.WriteFile(configPath, []byte(strings.Join(newLines, "\n")), fileInfo.Mode()); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
+	// Ensure data is written to disk
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync config: %w", err)
 	}
 
 	return nil
