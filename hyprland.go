@@ -162,6 +162,12 @@ func readMonitors() ([]Monitor, error) {
 
 			// Advanced display settings
 			Transform: int(hm.Transform),
+			VRR: func() int {
+				if hm.VRR {
+					return 1
+				}
+				return 0
+			}(),
 
 			// Mirror settings
 			IsMirrored: hm.MirrorOf != "" && hm.MirrorOf != "none",
