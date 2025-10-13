@@ -160,6 +160,9 @@ func readMonitors() ([]Monitor, error) {
 			EDIDName: hm.Description,
 			Modes:    modes,
 
+			// Advanced display settings
+			Transform: int(hm.Transform),
+
 			// Mirror settings
 			IsMirrored: hm.MirrorOf != "" && hm.MirrorOf != "none",
 			MirrorSource: func() string {
