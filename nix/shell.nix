@@ -25,7 +25,6 @@ in {
 
         packages = concatLists [
           (with pkgs; [
-            go_1_25
             go-tools
             gotools
             mod
@@ -37,10 +36,12 @@ in {
             gomod2nix.packages.default
           ])
 
-          [
-            config.packages.deadnix
-            self'.packages.hyprmon
-          ]
+          (with self'.packages; [
+            hyprmon
+            hyprmon.go
+          ])
+
+          [config.packages.deadnix]
         ];
       };
     };

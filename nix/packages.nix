@@ -4,14 +4,33 @@
   inputs,
   ...
 }: let
-  inherit (lib) substring fileContents const;
+  inherit (lib) readFile match head hasAttr getAttr replaceStrings substring fileContents const;
+
+  goVersion =
+    self
+    + "/go.mod"
+    |> readFile
+    |> match ".\n?go ([0-9]+\.[0-9]+)."
+    |> (matchResult:
+      if matchResult == null
+      then null
+      else head matchResult);
+
+  goAttr =
+    if goVersion == null
+    then "go"
+    else "go_" + replaceStrings ["."] ["_"] goVersion;
 
   versionRev =
     if self ? rev
     then substring 0 8 self.rev
     else "dirty";
 
-  version = "v${fileContents (self + "/VERSION")}-${versionRev}-flake";
+  version =
+    self
+    + "/VERSION"
+    |> fileContents
+    |> (versionText: "v${versionText}-${versionRev}-flake");
 in {
   perSystem = {
     system,
@@ -19,7 +38,12 @@ in {
     self',
     inputs',
     ...
-  }: {
+  }: let
+    go =
+      if hasAttr goAttr pkgs
+      then getAttr goAttr pkgs
+      else pkgs.go;
+  in {
     _module.args.pkgs = import inputs.nixpkgs {
       inherit system;
 
@@ -33,9 +57,8 @@ in {
       default = self'.packages.hyprmon;
 
       hyprmon = pkgs.buildGoApplication {
-        go = pkgs.go_1_25;
         pname = "hyprmon";
-        inherit version;
+        inherit go version;
 
         subPackages = ["."];
         CGO_ENABLED = "0";
