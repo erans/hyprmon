@@ -25,22 +25,6 @@ HyprMon is a TUI (Terminal User Interface) tool for configuring monitors on Arch
 
 ![Profiles Screen](./img/hyprmon-profiles.png)
 
-## Try it!
-
-If you have Nix setup you can try out `hyprmon` without installing it:
-
-```bash
-# Using flakes
-nix run github:erans/hyprmon --accept-flake-config
-# or, from nixpkgs-unstable
-nix run nixpkgs#hyprmon
-
-# Legacy nix
-nix-shell -p hyprmon
-```
-
-Nix will build the `hyprmon` package and run it.
-
 ## Installation
 
 ### Arch Linux
@@ -52,6 +36,19 @@ yay -S hyprmon-bin
 ```
 
 ### Nix
+
+[![nixpkgs unstable package](https://repology.org/badge/version-for-repo/nix_unstable/hyprmon.svg)](https://repology.org/project/hyprmon/versions)
+
+#### Try it!
+
+If you have Nix setup you can try out `hyprmon` without installing it:
+
+```bash
+# Using flakes
+nix run github:erans/hyprmon --accept-flake-config
+# or, from nixpkgs-unstable
+nix run nixpkgs#hyprmon
+```
 
 #### From Nixpkgs
 
