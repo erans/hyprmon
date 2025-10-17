@@ -3,8 +3,26 @@ name: Nix CI
 on:
   push:
     branches: [main]
+    paths:
+      - 'flake.nix'
+      - 'flake.lock'
+      - 'go.mod'
+      - 'go.sum'
+      - 'gomod2nix.toml'
+      - 'VERSION'
+      - '.github/workflows/nix-ci.yml'
+      - 'nix/**'
   pull_request:
     branches: [main]
+    paths:
+      - 'flake.nix'
+      - 'flake.lock'
+      - 'go.mod'
+      - 'go.sum'
+      - 'gomod2nix.toml'
+      - 'VERSION'
+      - '.github/workflows/nix-ci.yml'
+      - 'nix/**'
 
 jobs:
   nix-ci:
