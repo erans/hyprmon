@@ -1,3 +1,8 @@
+# Nix
+.direnv
+!.envrc
+result
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
