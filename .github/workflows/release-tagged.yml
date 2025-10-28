@@ -83,7 +83,7 @@ jobs:
           tar czf ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.tar.gz ${{ env.BINARY_NAME }}-${{ matrix.suffix }} README.md LICENSE
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ env.BINARY_NAME }}-${{ matrix.suffix }}
           path: ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.tar.gz
