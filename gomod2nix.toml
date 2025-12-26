@@ -59,11 +59,11 @@ schema = 3
     version = "v0.0.0-20220910002029-abceb7e1c41e"
     hash = "sha256-GyCDxxMQhXA3Pi/TsWXpA8cX5akEoZV7CFx4RO3rARU="
   [mod."golang.org/x/sys"]
-    version = "v0.37.0"
-    hash = "sha256-5aT0xP02sW1o9sfJHtWoGGNVYDdwb9FyiX/n6RAlzPo="
+    version = "v0.38.0"
+    hash = "sha256-1+i5EaG3JwH3KMtefzJLG5R6jbOeJM4GK3/LHBVnSy0="
   [mod."golang.org/x/term"]
-    version = "v0.36.0"
-    hash = "sha256-5YLOE1v+5zEXG62rGrJKXyuDM/ylDnJQW/hLwbMLrY8="
+    version = "v0.37.0"
+    hash = "sha256-w7OZlNTd5sAhnDxrl9lKpKc1U/s2+MyZnmQPllJopMQ="
   [mod."golang.org/x/text"]
     version = "v0.3.8"
     hash = "sha256-KKHU0OMfT4oxTIzIVqan8MY8wNvgBW00s24hF+kWbMA="
