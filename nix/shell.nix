@@ -1,6 +1,4 @@
-{lib, ...}: let
-  inherit (lib) concatLists;
-in {
+{
   perSystem = {
     self',
     pkgs,
@@ -11,37 +9,22 @@ in {
     devShells = {
       default = self'.devShells.hyprmon;
 
-      hyprmon = pkgs.mkShell {
+      hyprmon = pkgs.mkShellNoCC {
         name = "hyprmon-dev";
 
-        inputsFrom = concatLists [
-          (with config; [
-            flake-root.devShell
-            treefmt.build.devShell
-          ])
-
-          [inputs'.deadnix.devShells]
+        inputsFrom = [
+          config.treefmt.build.devShell
+          self'.packages.hyprmon
         ];
 
-        packages = concatLists [
-          (with pkgs; [
-            go-tools
-            gotools
-            mod
-            pre-commit
-          ])
-
-          (with inputs'; [
-            alejandra.packages.default
-            gomod2nix.packages.default
-          ])
-
-          (with self'.packages; [
-            hyprmon
-            hyprmon.go
-          ])
-
-          [config.packages.deadnix]
+        packages = [
+          inputs'.gomod2nix.packages.default
+          pkgs.flake-checker
+          pkgs.go-tools
+          pkgs.gotools
+          pkgs.mod
+          pkgs.pre-commit
+          self'.packages.hyprmon
         ];
       };
     };
