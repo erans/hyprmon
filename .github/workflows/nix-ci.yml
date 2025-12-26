@@ -46,15 +46,15 @@ jobs:
 
       - name: Check Flake Inputs
         id: flakecheck
+        continue-on-error: true
         uses: DeterminateSystems/flake-checker-action@main
-        with:
-          fail-mode: true
 
       - name: Update flake.lock if outdated
-        if: failure() && steps.flakecheck.outcome == 'failure'
+        if: >
+          steps.flakecheck.outcome == 'failure' &&
+          github.event_name == 'push'
         uses: DeterminateSystems/update-flake-lock@main
         with:
-          nix-options: --extra-experimental-features pipe-operators
           commit-msg: |
             chore: update flake.lock (auto via CI)
           pr-title: |
@@ -62,27 +62,23 @@ jobs:
           pr-body: |
             Flake inputs were outdated and have been updated automatically.
 
-      - name: Build Project via Flake
-        run: >
-          nix build .
-          --accept-flake-config
-          --extra-experimental-features pipe-operators
+      - name: nix flake check
+        run: nix flake check --accept-flake-config
 
       - name: Regenerate gomod2nix files
-        run: >
-          nix develop .#devShells.x86_64-linux.default
-          --accept-flake-config
-          --extra-experimental-features pipe-operators
-          -c gomod2nix generate
+        run: |
+          nix develop .#devShells.x86_64-linux.default \
+            --accept-flake-config \
+            -c gomod2nix generate
 
       - name: Commit gomod2nix changes
         run: |
-          if git diff --exit-code > /dev/null; then
+          if git diff --quiet; then
             echo "No gomod2nix changes detected."
           else
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add .
+            git add gomod2nix.toml
             git commit -m "chore: update gomod2nix metadata (auto via CI)"
             git push origin HEAD:${{ github.ref_name }}
           fi
