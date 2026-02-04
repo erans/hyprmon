@@ -4,66 +4,68 @@
   inputs,
   ...
 }: let
-  inherit (lib) readFile match head hasAttr getAttr replaceStrings substring fileContents const;
+  pname = "hyprmon";
+  basePath = ./..;
 
-  goVersion =
-    self
-    + "/go.mod"
-    |> readFile
-    |> match ".\n?go ([0-9]+\.[0-9]+)."
-    |> (matchResult:
-      if matchResult == null
-      then null
-      else head matchResult);
+  goVersion = let
+    matchResult =
+      lib.strings.match ".\n?go ([0-9]+\.[0-9]+)."
+      (lib.strings.readFile (self + "/go.mod"));
+  in
+    if matchResult == null
+    then null
+    else lib.lists.head matchResult;
 
   goAttr =
     if goVersion == null
     then "go"
-    else "go_" + replaceStrings ["."] ["_"] goVersion;
+    else "go_" + lib.strings.replaceStrings ["."] ["_"] goVersion;
 
-  versionRev =
-    if self ? rev
-    then substring 0 8 self.rev
-    else "dirty";
-
-  version =
-    self
-    + "/VERSION"
-    |> fileContents
-    |> (versionText: "v${versionText}-${versionRev}-flake");
+  rawVersion = lib.strings.fileContents (self + "/VERSION");
+  vcsSuffix = "${self.shortRev or self.dirtyShortRev or "dev"}-${self._type}";
 in {
   perSystem = {
-    system,
     pkgs,
     self',
     inputs',
     ...
   }: let
     go =
-      if hasAttr goAttr pkgs
-      then getAttr goAttr pkgs
+      if lib.attrsets.hasAttr goAttr pkgs
+      then lib.attrsets.getAttr goAttr pkgs
       else pkgs.go;
   in {
-    _module.args.pkgs = import inputs.nixpkgs {
-      inherit system;
-
-      overlays = with inputs; [
-        gitignore.overlay
-        gomod2nix.overlays.default
-      ];
-    };
-
     packages = {
       default = self'.packages.hyprmon;
 
-      hyprmon = pkgs.buildGoApplication {
-        pname = "hyprmon";
-        inherit go version;
+      hyprmon = inputs'.gomod2nix.legacyPackages.buildGoApplication {
+        inherit pname go;
+        version = "v${rawVersion}-${vcsSuffix}";
 
         subPackages = ["."];
         CGO_ENABLED = "0";
 
-        src = pkgs.gitignoreSource ./..;
+        src = lib.sources.cleanSourceWith {
+          src = basePath;
+          name = pname + "-source";
+
+          filter = inputs.gitignore.lib.gitignoreFilterWith {
+            inherit basePath;
+
+            extraRules = ''
+              flake.lock
+              flake.nix
+              .github/
+              nix/
+              result/
+              scripts/
+              release.sh
+              Makefile
+              img/
+            '';
+          };
+        };
+
         pwd = self;
         modules = self + "/gomod2nix.toml";
 
@@ -72,14 +74,10 @@ in {
           homepage = "https://github.com/erans/hyprmon";
           license = lib.licenses.asl20;
           platforms = lib.platforms.linux;
-          maintainers = with lib.maintainers; [onatustun];
+          maintainers = [lib.maintainers.onatustun];
           mainProgram = "hyprmon";
         };
       };
-
-      deadnix =
-        inputs'.deadnix.packages.default.overrideAttrs
-        <| const {meta.mainProgram = "deadnix";};
     };
   };
 }

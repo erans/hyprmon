@@ -2,7 +2,7 @@
   perSystem = {self', ...}: {
     checks = {
       default = self'.checks.hyprmon;
-      hyprmon = self'.packages.hyprmon;
+      inherit (self'.packages) hyprmon;
     };
   };
 }
