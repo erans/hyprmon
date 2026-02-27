@@ -51,6 +51,46 @@ func disambiguateHardwareIDs(monitors []Monitor) {
 	}
 }
 
+// resolveProfileMonitors takes saved profile monitors and maps them to
+// currently connected monitors by HardwareID. Returns only monitors that
+// are currently connected, with their connector Name updated to the current value.
+func resolveProfileMonitors(saved, current []Monitor) []Monitor {
+	currentByHWID := make(map[string]Monitor)
+	currentByName := make(map[string]Monitor)
+	for _, m := range current {
+		if m.HardwareID != "" {
+			currentByHWID[m.HardwareID] = m
+		}
+		currentByName[m.Name] = m
+	}
+
+	var resolved []Monitor
+	for _, savedMon := range saved {
+		var currentMon Monitor
+		var found bool
+
+		if savedMon.HardwareID != "" {
+			currentMon, found = currentByHWID[savedMon.HardwareID]
+		} else {
+			// Fallback to Name only for legacy profiles (no HardwareID)
+			currentMon, found = currentByName[savedMon.Name]
+		}
+
+		if !found {
+			continue
+		}
+
+		resolvedMon := savedMon
+		resolvedMon.Name = currentMon.Name
+		if resolvedMon.HardwareID == "" {
+			resolvedMon.HardwareID = currentMon.HardwareID
+		}
+		resolved = append(resolved, resolvedMon)
+	}
+
+	return resolved
+}
+
 // DisplayLabel returns the best human-readable label for a monitor.
 // Priority: Alias > Model > Name.
 func (m Monitor) DisplayLabel() string {

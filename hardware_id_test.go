@@ -207,6 +207,144 @@ func TestDisambiguateHardwareIDs(t *testing.T) {
 	})
 }
 
+func TestCompareMonitorConfigurationsUsesHardwareID(t *testing.T) {
+	tests := []struct {
+		name     string
+		current  []Monitor
+		saved    []Monitor
+		expected bool
+	}{
+		{
+			name: "Match by HardwareID even with different connector names",
+			current: []Monitor{
+				{Name: "DP-4", HardwareID: "Dell Inc./DELL U3419W/5HJB6T2", PxW: 3440, PxH: 1440, X: 0, Y: 0, Active: true},
+			},
+			saved: []Monitor{
+				{Name: "DP-3", HardwareID: "Dell Inc./DELL U3419W/5HJB6T2", PxW: 3440, PxH: 1440, X: 0, Y: 0, Active: true},
+			},
+			expected: true,
+		},
+		{
+			name: "No match when HardwareID differs",
+			current: []Monitor{
+				{Name: "DP-3", HardwareID: "Dell Inc./DELL U3419W/5HJB6T2", PxW: 3440, PxH: 1440, X: 0, Y: 0, Active: true},
+			},
+			saved: []Monitor{
+				{Name: "DP-3", HardwareID: "LG/27UK850/ABC123", PxW: 3440, PxH: 1440, X: 0, Y: 0, Active: true},
+			},
+			expected: false,
+		},
+		{
+			name: "Fallback to Name when saved HardwareID is empty (legacy)",
+			current: []Monitor{
+				{Name: "DP-3", HardwareID: "Dell Inc./DELL U3419W/5HJB6T2", PxW: 3440, PxH: 1440, X: 0, Y: 0, Active: true},
+			},
+			saved: []Monitor{
+				{Name: "DP-3", HardwareID: "", PxW: 3440, PxH: 1440, X: 0, Y: 0, Active: true},
+			},
+			expected: true,
+		},
+		{
+			name: "Different resolution - no match",
+			current: []Monitor{
+				{Name: "DP-3", HardwareID: "Dell/U3419W/5HJB6T2", PxW: 3440, PxH: 1440, X: 0, Y: 0, Active: true},
+			},
+			saved: []Monitor{
+				{Name: "DP-3", HardwareID: "Dell/U3419W/5HJB6T2", PxW: 1920, PxH: 1080, X: 0, Y: 0, Active: true},
+			},
+			expected: false,
+		},
+		{
+			name: "Different count - no match",
+			current: []Monitor{
+				{Name: "DP-3", HardwareID: "Dell/U3419W/5HJB6T2", PxW: 3440, PxH: 1440, X: 0, Y: 0, Active: true},
+				{Name: "eDP-1", HardwareID: "Samsung/ATNA33AA08-0", PxW: 2880, PxH: 1800, X: 3440, Y: 0, Active: true},
+			},
+			saved: []Monitor{
+				{Name: "DP-3", HardwareID: "Dell/U3419W/5HJB6T2", PxW: 3440, PxH: 1440, X: 0, Y: 0, Active: true},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := compareMonitorConfigurations(tt.current, tt.saved)
+			if result != tt.expected {
+				t.Errorf("compareMonitorConfigurations() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestResolveProfileMonitors(t *testing.T) {
+	current := []Monitor{
+		{Name: "DP-4", HardwareID: "Dell Inc./DELL U3419W/5HJB6T2", PxW: 3440, PxH: 1440},
+		{Name: "eDP-1", HardwareID: "Samsung Display Corp./ATNA33AA08-0", PxW: 2880, PxH: 1800},
+	}
+
+	tests := []struct {
+		name          string
+		saved         []Monitor
+		expectedCount int
+		expectedNames map[string]string // HardwareID -> expected Name
+	}{
+		{
+			name: "Remap connector names via HardwareID",
+			saved: []Monitor{
+				{Name: "DP-3", HardwareID: "Dell Inc./DELL U3419W/5HJB6T2", PxW: 3440, PxH: 1440, X: 0, Y: 0},
+				{Name: "eDP-1", HardwareID: "Samsung Display Corp./ATNA33AA08-0", PxW: 2880, PxH: 1800, X: 3440, Y: 0},
+			},
+			expectedCount: 2,
+			expectedNames: map[string]string{
+				"Dell Inc./DELL U3419W/5HJB6T2":      "DP-4",
+				"Samsung Display Corp./ATNA33AA08-0": "eDP-1",
+			},
+		},
+		{
+			name: "Skip disconnected monitors",
+			saved: []Monitor{
+				{Name: "DP-3", HardwareID: "Dell Inc./DELL U3419W/5HJB6T2", PxW: 3440, PxH: 1440},
+				{Name: "HDMI-1", HardwareID: "LG/27UK850/XYZ", PxW: 3840, PxH: 2160},
+			},
+			expectedCount: 1,
+			expectedNames: map[string]string{
+				"Dell Inc./DELL U3419W/5HJB6T2": "DP-4",
+			},
+		},
+		{
+			name: "Legacy profile uses Name fallback",
+			saved: []Monitor{
+				{Name: "eDP-1", PxW: 2880, PxH: 1800, X: 0, Y: 0},
+			},
+			expectedCount: 1,
+			expectedNames: map[string]string{
+				"Samsung Display Corp./ATNA33AA08-0": "eDP-1",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolved := resolveProfileMonitors(tt.saved, current)
+			if len(resolved) != tt.expectedCount {
+				t.Errorf("got %d monitors, want %d", len(resolved), tt.expectedCount)
+				return
+			}
+			for _, m := range resolved {
+				expectedName, ok := tt.expectedNames[m.HardwareID]
+				if !ok {
+					t.Errorf("unexpected HardwareID %q in resolved monitors", m.HardwareID)
+					continue
+				}
+				if m.Name != expectedName {
+					t.Errorf("HardwareID %q has Name=%q, want %q", m.HardwareID, m.Name, expectedName)
+				}
+			}
+		})
+	}
+}
+
 func TestMonitorDisplayLabel(t *testing.T) {
 	tests := []struct {
 		name     string
