@@ -231,15 +231,6 @@ func applyProfile(name string) error {
 	return nil
 }
 
-// monitorMatchKey returns the key to use for matching a monitor.
-// Prefers HardwareID; falls back to Name for legacy profiles.
-func monitorMatchKey(m Monitor) string {
-	if m.HardwareID != "" {
-		return m.HardwareID
-	}
-	return m.Name
-}
-
 // compareMonitorConfigurations compares two monitor configurations for equality.
 // Uses HardwareID as the primary key when available, falling back to Name for
 // backward compatibility with legacy profiles.
