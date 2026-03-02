@@ -91,6 +91,42 @@ func resolveProfileMonitors(saved, current []Monitor) []Monitor {
 	return resolved
 }
 
+// migrateProfileMonitors backfills HardwareID on legacy profile monitors
+// by matching their Name against currently connected monitors.
+func migrateProfileMonitors(saved, current []Monitor) []Monitor {
+	currentByName := make(map[string]Monitor)
+	for _, m := range current {
+		currentByName[m.Name] = m
+	}
+
+	migrated := make([]Monitor, len(saved))
+	copy(migrated, saved)
+
+	for i, m := range migrated {
+		if m.HardwareID != "" {
+			continue // Already has a HardwareID
+		}
+		if currentMon, ok := currentByName[m.Name]; ok {
+			migrated[i].HardwareID = currentMon.HardwareID
+			migrated[i].Make = currentMon.Make
+			migrated[i].Model = currentMon.Model
+			migrated[i].Serial = currentMon.Serial
+		}
+	}
+
+	return migrated
+}
+
+// needsMigration checks if any monitor in the profile lacks a HardwareID.
+func needsMigration(monitors []Monitor) bool {
+	for _, m := range monitors {
+		if m.HardwareID == "" {
+			return true
+		}
+	}
+	return false
+}
+
 // DisplayLabel returns the best human-readable label for a monitor.
 // Priority: Alias > Model > Name.
 func (m Monitor) DisplayLabel() string {

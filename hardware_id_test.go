@@ -345,6 +345,98 @@ func TestResolveProfileMonitors(t *testing.T) {
 	}
 }
 
+func TestMigrateProfileMonitors(t *testing.T) {
+	current := []Monitor{
+		{Name: "DP-3", HardwareID: "Dell Inc./DELL U3419W/5HJB6T2", Make: "Dell Inc.", Model: "DELL U3419W", Serial: "5HJB6T2"},
+		{Name: "eDP-1", HardwareID: "Samsung Display Corp./ATNA33AA08-0", Make: "Samsung Display Corp.", Model: "ATNA33AA08-0"},
+	}
+
+	tests := []struct {
+		name        string
+		saved       []Monitor
+		expectHWIDs map[string]string // Name -> expected HardwareID after migration
+	}{
+		{
+			name: "Legacy monitors get HardwareID from current",
+			saved: []Monitor{
+				{Name: "DP-3", PxW: 3440, PxH: 1440},
+				{Name: "eDP-1", PxW: 2880, PxH: 1800},
+			},
+			expectHWIDs: map[string]string{
+				"DP-3":  "Dell Inc./DELL U3419W/5HJB6T2",
+				"eDP-1": "Samsung Display Corp./ATNA33AA08-0",
+			},
+		},
+		{
+			name: "Already migrated monitors unchanged",
+			saved: []Monitor{
+				{Name: "DP-3", HardwareID: "Dell Inc./DELL U3419W/5HJB6T2", PxW: 3440, PxH: 1440},
+			},
+			expectHWIDs: map[string]string{
+				"DP-3": "Dell Inc./DELL U3419W/5HJB6T2",
+			},
+		},
+		{
+			name: "Disconnected monitor keeps empty HardwareID",
+			saved: []Monitor{
+				{Name: "HDMI-1", PxW: 1920, PxH: 1080},
+			},
+			expectHWIDs: map[string]string{
+				"HDMI-1": "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			migrated := migrateProfileMonitors(tt.saved, current)
+			for _, m := range migrated {
+				expected, ok := tt.expectHWIDs[m.Name]
+				if !ok {
+					t.Errorf("unexpected monitor Name %q", m.Name)
+					continue
+				}
+				if m.HardwareID != expected {
+					t.Errorf("monitor %q HardwareID = %q, want %q", m.Name, m.HardwareID, expected)
+				}
+			}
+		})
+	}
+}
+
+func TestNeedsMigration(t *testing.T) {
+	tests := []struct {
+		name     string
+		monitors []Monitor
+		expected bool
+	}{
+		{
+			name:     "All have HardwareID",
+			monitors: []Monitor{{HardwareID: "Dell/U3419W/5HJB6T2"}, {HardwareID: "Samsung/ATNA33AA08-0"}},
+			expected: false,
+		},
+		{
+			name:     "One missing HardwareID",
+			monitors: []Monitor{{HardwareID: "Dell/U3419W/5HJB6T2"}, {HardwareID: ""}},
+			expected: true,
+		},
+		{
+			name:     "Empty list",
+			monitors: []Monitor{},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := needsMigration(tt.monitors)
+			if got != tt.expected {
+				t.Errorf("needsMigration() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestMonitorDisplayLabel(t *testing.T) {
 	tests := []struct {
 		name     string
