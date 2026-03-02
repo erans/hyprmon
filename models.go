@@ -19,13 +19,13 @@ type Monitor struct {
 	Serial     string `json:"serial,omitempty"`
 	PxW        uint32
 	PxH        uint32
-	Hz       float32
-	Scale    float32
-	X        int32
-	Y        int32
-	Active   bool
-	EDIDName string
-	Modes    []Mode
+	Hz         float32
+	Scale      float32
+	X          int32
+	Y          int32
+	Active     bool
+	EDIDName   string
+	Modes      []Mode
 
 	// Advanced display settings
 	BitDepth      uint8   // 8 or 10
