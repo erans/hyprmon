@@ -300,6 +300,21 @@ func compareMonitorConfigurations(current, saved []Monitor) bool {
 	return true
 }
 
+// migrateProfileIfNeeded checks if a profile needs HardwareID migration
+// and performs it using currently connected monitors. Saves the migrated profile.
+func migrateProfileIfNeeded(profile *Profile, currentMonitors []Monitor) bool {
+	if !needsMigration(profile.Monitors) {
+		return false
+	}
+
+	profile.Monitors = migrateProfileMonitors(profile.Monitors, currentMonitors)
+	profile.UpdatedAt = time.Now()
+
+	// Best-effort save - don't fail if we can't persist
+	_ = saveProfile(profile.Name, profile.Monitors)
+	return true
+}
+
 // getCurrentActiveProfile returns the name of the currently active profile by comparing
 // the current monitor configuration with all saved profiles
 func getCurrentActiveProfile() (string, error) {
@@ -321,6 +336,9 @@ func getCurrentActiveProfile() (string, error) {
 		if err != nil {
 			continue // Skip profiles that can't be loaded
 		}
+
+		// Migrate legacy profiles on access
+		migrateProfileIfNeeded(profile, currentMonitors)
 
 		if compareMonitorConfigurations(currentMonitors, profile.Monitors) {
 			return profileName, nil
