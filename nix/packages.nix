@@ -44,6 +44,7 @@ in {
 
         subPackages = ["."];
         CGO_ENABLED = "0";
+        GOTOOLCHAIN = "local";
 
         src = lib.sources.cleanSourceWith {
           src = basePath;
