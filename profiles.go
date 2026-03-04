@@ -212,61 +212,98 @@ func applyProfile(name string) error {
 		return fmt.Errorf("failed to load profile %s: %w", name, err)
 	}
 
-	saveRollback(profile.Monitors)
+	currentMonitors, err := readMonitors()
+	if err != nil {
+		return fmt.Errorf("failed to read current monitors: %w", err)
+	}
 
-	if err := applyMonitors(profile.Monitors); err != nil {
+	resolved := resolveProfileMonitors(profile.Monitors, currentMonitors)
+	if len(resolved) == 0 {
+		return fmt.Errorf("no monitors from profile %q are currently connected", name)
+	}
+
+	saveRollback(resolved)
+
+	if err := applyMonitors(resolved); err != nil {
 		return fmt.Errorf("failed to apply profile: %w", err)
 	}
 
 	return nil
 }
 
-// compareMonitorConfigurations compares two monitor configurations for equality
+// compareMonitorConfigurations compares two monitor configurations for equality.
+// Uses HardwareID as the primary key when available, falling back to Name for
+// backward compatibility with legacy profiles.
 func compareMonitorConfigurations(current, saved []Monitor) bool {
 	if len(current) != len(saved) {
 		return false
 	}
 
-	// Create maps for easier lookup by monitor name
-	currentMap := make(map[string]Monitor)
-	savedMap := make(map[string]Monitor)
-
+	// Build lookup from current monitors
+	currentByHWID := make(map[string]Monitor)
+	currentByName := make(map[string]Monitor)
 	for _, m := range current {
-		currentMap[m.Name] = m
+		if m.HardwareID != "" {
+			currentByHWID[m.HardwareID] = m
+		}
+		currentByName[m.Name] = m
 	}
 
-	for _, m := range saved {
-		savedMap[m.Name] = m
-	}
+	// Try to match each saved monitor to a current monitor
+	matched := make(map[string]bool) // track which current monitors have been matched
+	for _, savedMon := range saved {
+		var currentMon Monitor
+		var found bool
+		var matchedKey string
 
-	// Check if both configurations have the same monitors
-	for name := range currentMap {
-		if _, exists := savedMap[name]; !exists {
+		if savedMon.HardwareID != "" {
+			currentMon, found = currentByHWID[savedMon.HardwareID]
+			if found {
+				matchedKey = currentMon.HardwareID
+			}
+		} else {
+			// Fallback to Name only for legacy profiles (no HardwareID)
+			currentMon, found = currentByName[savedMon.Name]
+			if found {
+				matchedKey = currentMon.Name
+			}
+		}
+
+		if !found {
+			return false
+		}
+
+		if matched[matchedKey] {
+			return false // Already matched this monitor to a different saved entry
+		}
+		matched[matchedKey] = true
+
+		// Compare configuration properties
+		if currentMon.PxW != savedMon.PxW ||
+			currentMon.PxH != savedMon.PxH ||
+			currentMon.X != savedMon.X ||
+			currentMon.Y != savedMon.Y ||
+			currentMon.Active != savedMon.Active {
 			return false
 		}
 	}
 
-	for name := range savedMap {
-		if _, exists := currentMap[name]; !exists {
-			return false
-		}
+	return true
+}
+
+// migrateProfileIfNeeded checks if a profile needs HardwareID migration
+// and performs it using currently connected monitors. Saves the migrated profile.
+func migrateProfileIfNeeded(profile *Profile, currentMonitors []Monitor) bool {
+	if !needsMigration(profile.Monitors) {
+		return false
 	}
 
-	// Compare each monitor's configuration - ALL monitors must match
-	for name, currentMonitor := range currentMap {
-		savedMonitor := savedMap[name]
+	profile.Monitors = migrateProfileMonitors(profile.Monitors, currentMonitors)
+	profile.UpdatedAt = time.Now()
 
-		// Check if all key properties match for this monitor
-		if currentMonitor.PxW != savedMonitor.PxW ||
-			currentMonitor.PxH != savedMonitor.PxH ||
-			currentMonitor.X != savedMonitor.X ||
-			currentMonitor.Y != savedMonitor.Y ||
-			currentMonitor.Active != savedMonitor.Active {
-			return false // If any monitor doesn't match, configurations are different
-		}
-	}
-
-	return true // All monitors match
+	// Best-effort save - don't fail if we can't persist
+	_ = saveProfile(profile.Name, profile.Monitors)
+	return true
 }
 
 // getCurrentActiveProfile returns the name of the currently active profile by comparing
@@ -290,6 +327,9 @@ func getCurrentActiveProfile() (string, error) {
 		if err != nil {
 			continue // Skip profiles that can't be loaded
 		}
+
+		// Migrate legacy profiles on access
+		migrateProfileIfNeeded(profile, currentMonitors)
 
 		if compareMonitorConfigurations(currentMonitors, profile.Monitors) {
 			return profileName, nil

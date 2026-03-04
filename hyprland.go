@@ -149,16 +149,20 @@ func readMonitors() ([]Monitor, error) {
 		}
 
 		monitor := Monitor{
-			Name:     hm.Name,
-			PxW:      uint32(hm.Width),
-			PxH:      uint32(hm.Height),
-			Hz:       float32(hm.RefreshRate),
-			Scale:    float32(hm.Scale),
-			X:        int32(hm.X),
-			Y:        int32(hm.Y),
-			Active:   !hm.Disabled,
-			EDIDName: hm.Description,
-			Modes:    modes,
+			Name:       hm.Name,
+			Make:       hm.Make,
+			Model:      hm.Model,
+			Serial:     hm.Serial,
+			HardwareID: buildHardwareID(hm.Make, hm.Model, hm.Serial),
+			PxW:        uint32(hm.Width),
+			PxH:        uint32(hm.Height),
+			Hz:         float32(hm.RefreshRate),
+			Scale:      float32(hm.Scale),
+			X:          int32(hm.X),
+			Y:          int32(hm.Y),
+			Active:     !hm.Disabled,
+			EDIDName:   hm.Description,
+			Modes:      modes,
 
 			// Advanced display settings
 			Transform: int(hm.Transform),
@@ -188,6 +192,9 @@ func readMonitors() ([]Monitor, error) {
 			}
 		}
 	}
+
+	// Disambiguate monitors with identical HardwareIDs
+	disambiguateHardwareIDs(monitors)
 
 	return monitors, nil
 }

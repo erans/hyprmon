@@ -11,16 +11,21 @@ type Mode struct {
 }
 
 type Monitor struct {
-	Name     string
-	PxW      uint32
-	PxH      uint32
-	Hz       float32
-	Scale    float32
-	X        int32
-	Y        int32
-	Active   bool
-	EDIDName string
-	Modes    []Mode
+	Name       string `json:"name"`
+	HardwareID string `json:"hardware_id,omitempty"`
+	Alias      string `json:"alias,omitempty"`
+	Make       string `json:"make,omitempty"`
+	Model      string `json:"model,omitempty"`
+	Serial     string `json:"serial,omitempty"`
+	PxW        uint32
+	PxH        uint32
+	Hz         float32
+	Scale      float32
+	X          int32
+	Y          int32
+	Active     bool
+	EDIDName   string
+	Modes      []Mode
 
 	// Advanced display settings
 	BitDepth      uint8   // 8 or 10

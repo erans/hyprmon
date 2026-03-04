@@ -416,7 +416,7 @@ func (m model) renderMonitor(desktop [][]rune, mon Monitor, selected bool) {
 			statusLabel += fmt.Sprintf(" ←%d", len(mon.MirrorTargets))
 		}
 	}
-	nameLabel := fmt.Sprintf("%s %s", mon.Name, statusLabel)
+	nameLabel := fmt.Sprintf("%s %s", mon.DisplayLabel(), statusLabel)
 	if len(nameLabel) > tx2-tx1-2 {
 		nameLabel = nameLabel[:tx2-tx1-2]
 	}
@@ -600,8 +600,8 @@ func (m model) renderDetails() string {
 	}
 
 	mon := m.Monitors[m.Selected]
-	details := fmt.Sprintf("Details: %s  pos %d,%d  size %dx%d @%.0fHz  scale %.2f",
-		mon.Name, mon.X, mon.Y, mon.PxW, mon.PxH, mon.Hz, mon.Scale)
+	details := fmt.Sprintf("Details: %s (%s)  pos %d,%d  size %dx%d @%.0fHz  scale %.2f",
+		mon.DisplayLabel(), mon.Name, mon.X, mon.Y, mon.PxW, mon.PxH, mon.Hz, mon.Scale)
 
 	if m.Status != "" {
 		details += "  |  " + statusStyle.Render(m.Status)
