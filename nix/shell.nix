@@ -24,7 +24,6 @@
           pkgs.gotools
           pkgs.mod
           pkgs.pre-commit
-          self'.packages.hyprmon
         ];
       };
     };

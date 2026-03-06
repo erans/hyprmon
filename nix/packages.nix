@@ -1,70 +1,58 @@
 {
   lib,
   self,
-  inputs,
   ...
 }: let
-  pname = "hyprmon";
-  basePath = ./..;
-
   goVersion = let
-    matchResult =
-      lib.strings.match ".\n?go ([0-9]+\.[0-9]+)."
-      (lib.strings.readFile (self + "/go.mod"));
+    lines = lib.strings.splitString "\n" (lib.strings.readFile (self + "/go.mod"));
+    goLine = lib.lists.elemAt lines 2;
+    matchResult = lib.strings.match "go ([0-9]+\\.[0-9]+)(\\.[0-9]+)?" goLine;
   in
     if matchResult == null
     then null
-    else lib.lists.head matchResult;
+    else lib.lists.elemAt matchResult 0;
 
   goAttr =
     if goVersion == null
     then "go"
     else "go_" + lib.strings.replaceStrings ["."] ["_"] goVersion;
 
-  rawVersion = lib.strings.fileContents (self + "/VERSION");
-  vcsSuffix = "${self.shortRev or self.dirtyShortRev or "dev"}-${self._type}";
+  root = ./..;
 in {
   perSystem = {
     pkgs,
     self',
     inputs',
     ...
-  }: let
-    go =
-      if lib.attrsets.hasAttr goAttr pkgs
-      then lib.attrsets.getAttr goAttr pkgs
-      else pkgs.go;
-  in {
+  }: {
     packages = {
       default = self'.packages.hyprmon;
 
       hyprmon = inputs'.gomod2nix.legacyPackages.buildGoApplication {
-        inherit pname go;
-        version = "v${rawVersion}-${vcsSuffix}";
+        pname = "hyprmon";
+        version = "${self.shortRev or self.dirtyShortRev or "dev"}-${self._type}";
+
+        go =
+          if lib.attrsets.hasAttr goAttr pkgs
+          then lib.attrsets.getAttr goAttr pkgs
+          else pkgs.go;
 
         subPackages = ["."];
         CGO_ENABLED = "0";
         GOTOOLCHAIN = "local";
 
-        src = lib.sources.cleanSourceWith {
-          src = basePath;
-          name = pname + "-source";
+        src = lib.fileset.toSource {
+          inherit root;
 
-          filter = inputs.gitignore.lib.gitignoreFilterWith {
-            inherit basePath;
-
-            extraRules = ''
-              flake.lock
-              flake.nix
-              .github/
-              nix/
-              result/
-              scripts/
-              release.sh
-              Makefile
-              img/
-            '';
-          };
+          fileset =
+            lib.fileset.intersection
+            (lib.fileset.gitTracked root)
+            (lib.fileset.unions [
+              (lib.fileset.fileFilter (file: file.hasExt "go") root)
+              (root + "/go.mod")
+              (root + "/go.sum")
+              (root + "/gomod2nix.toml")
+            ]);
         };
 
         pwd = self;

@@ -1,6 +1,7 @@
 name: Nix CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -8,8 +9,6 @@ on:
       - 'flake.lock'
       - 'go.mod'
       - 'go.sum'
-      - 'gomod2nix.toml'
-      - 'VERSION'
       - '.github/workflows/nix-ci.yml'
       - 'nix/**'
   pull_request:
@@ -19,8 +18,6 @@ on:
       - 'flake.lock'
       - 'go.mod'
       - 'go.sum'
-      - 'gomod2nix.toml'
-      - 'VERSION'
       - '.github/workflows/nix-ci.yml'
       - 'nix/**'
 
@@ -31,7 +28,6 @@ jobs:
 
     permissions:
       contents: write
-      id-token: write
       pull-requests: write
 
     steps:
@@ -44,41 +40,75 @@ jobs:
       - name: Run the Magic Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@main
 
-      - name: Check Flake Inputs
-        id: flakecheck
-        continue-on-error: true
-        uses: DeterminateSystems/flake-checker-action@main
+      - name: Read required Go version from go.mod
+        id: goversion
+        run: |
+          set -euo pipefail
 
-      - name: Update flake.lock if outdated
+          REQUIRED_GO="$(
+            sed -nE 's/^go[[:space:]]+([0-9]+\.[0-9]+)$/\1/p' go.mod | head -n1
+          )"
+
+          if [ -z "${REQUIRED_GO}" ]; then
+            echo "Could not determine Go version from go.mod"
+            exit 1
+          fi
+
+          GO_ATTR="go_$(echo "$REQUIRED_GO" | tr '.' '_')"
+
+          echo "required_go=${REQUIRED_GO}" >> "$GITHUB_OUTPUT"
+          echo "go_attr=${GO_ATTR}" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether pinned nixpkgs has required Go
+        id: checkgo
+        run: |
+          set -euo pipefail
+
+          if nix eval --impure --raw --expr "
+            let
+              flake = builtins.getFlake (toString ./.);
+              pkgs = import flake.inputs.nixpkgs {
+                system = builtins.currentSystem;
+              };
+            in
+              if builtins.hasAttr \"${{ steps.goversion.outputs.go_attr }}\" pkgs
+              then \"yes\"
+              else \"no\"
+          " | grep -qx yes; then
+            echo "needs_flake_update=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_flake_update=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update flake.lock
         if: >
-          steps.flakecheck.outcome == 'failure' &&
-          github.event_name == 'push'
-        uses: DeterminateSystems/update-flake-lock@main
+          github.event_name == 'push' &&
+          steps.checkgo.outputs.needs_flake_update == 'true'
+        run: nix flake update --accept-flake-config
+
+      - name: Regenerate gomod2nix.toml
+        run: nix develop --accept-flake-config -c gomod2nix generate
+
+      - name: Create PR with updated flake.lock and/or gomod2nix.toml
+        if: github.event_name == 'push'
+        uses: peter-evans/create-pull-request@v7
         with:
-          commit-msg: |
-            chore: update flake.lock (auto via CI)
-          pr-title: |
-            Automated flake.lock update
-          pr-body: |
-            Flake inputs were outdated and have been updated automatically.
+          commit-message: |
+            chore: update flake inputs and gomod2nix metadata
+          title: |
+            chore: update flake inputs and gomod2nix metadata
+          body: |
+            This PR was created automatically by CI.
+
+            Updates included:
+            - `flake.lock` if current pinned inputs did not provide Go `${{ steps.goversion.outputs.required_go }}`
+            - regenerated `gomod2nix.toml`
+
+          branch: ci/update-nix-go-deps
+          delete-branch: true
+          add-paths: |
+            flake.lock
+            gomod2nix.toml
 
       - name: nix flake check
         run: nix flake check --accept-flake-config
-
-      - name: Regenerate gomod2nix files
-        run: |
-          nix develop .#devShells.x86_64-linux.default \
-            --accept-flake-config \
-            -c gomod2nix generate
-
-      - name: Commit gomod2nix changes
-        run: |
-          if git diff --quiet; then
-            echo "No gomod2nix changes detected."
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add gomod2nix.toml
-            git commit -m "chore: update gomod2nix metadata (auto via CI)"
-            git push origin HEAD:${{ github.ref_name }}
-          fi

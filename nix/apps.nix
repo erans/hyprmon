@@ -6,7 +6,7 @@
       hyprmon = {
         type = "app";
         program = lib.meta.getExe self'.packages.hyprmon;
-        meta.description = self'.packages.hyprmon.meta.description;
+        meta = {inherit (self'.packages.hyprmon.meta) description;};
       };
     };
   };
