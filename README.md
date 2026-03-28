@@ -44,9 +44,6 @@ yay -S hyprmon-bin
 If you have Nix setup you can try out `hyprmon` without installing it:
 
 ```bash
-# Using flakes
-nix run github:erans/hyprmon --accept-flake-config
-# or, from nixpkgs-unstable
 nix run nixpkgs#hyprmon
 ```
 
@@ -58,37 +55,6 @@ nix run nixpkgs#hyprmon
     pkgs.hyprmon
   ];
 }
-```
-
-#### Using Flakes
-
-First add the following to your configuration flake:
-
-```nix
-hyprmon.url = "github:erans/hyprmon";
-```
-
-Then include it in your configuration:
-
-```nix
-{
-  inputs,
-  pkgs,
-  ...
-}: {
-  environment.systemPackages = [ # or home.packages
-    inputs.hyprmon.packages.${pkgs.stdenv.hostPlatform.system}.hyprmon # or .default
-  ];
-}
-```
-
-#### Legacy Nix Commands
-```bash
-# Install to your user profile
-nix-env -i hyprmon
-
-# With the nix command
-nix profile install nixpkgs#hyprmon
 ```
 
 #### Prerequisites
