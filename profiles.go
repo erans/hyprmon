@@ -228,6 +228,14 @@ func applyProfile(name string) error {
 		return fmt.Errorf("failed to apply profile: %w", err)
 	}
 
+	if err := writeConfig(resolved); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+
+	if err := reloadConfig(); err != nil {
+		return fmt.Errorf("failed to reload config: %w", err)
+	}
+
 	return nil
 }
 
