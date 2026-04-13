@@ -224,8 +224,17 @@ func applyProfile(name string) error {
 
 	saveRollback(resolved)
 
+	// Get current monitor names before applying changes
+	previousNames, _ := getCurrentMonitorNames()
+
 	if err := applyMonitors(resolved); err != nil {
 		return fmt.Errorf("failed to apply profile: %w", err)
+	}
+
+	// Get monitor names after applying and migrate orphaned workspaces
+	currentNames, _ := getCurrentMonitorNames()
+	if err := migrateOrphanedWorkspaces(previousNames, currentNames); err != nil {
+		fmt.Printf("Warning: Failed to migrate workspaces: %v\n", err)
 	}
 
 	if err := writeConfig(resolved); err != nil {
