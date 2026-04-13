@@ -207,6 +207,19 @@ bind = $mainMod, F3, exec, hyprmon --profile laptop
 bind = $mainMod, F4, exec, hyprmon profiles
 ```
 
+### Laptop Lid / Clamshell Mode
+
+HyprMon profiles can be used for laptop clamshell mode by combining them with Hyprland's lid switch bindings. Create two profiles — one for docked use (laptop display off, external monitor only) and one for laptop-only use — then add these lines to your `hyprland.conf`:
+
+```
+bindl = , switch:on:Lid Switch, exec, hyprmon --profile docked
+bindl = , switch:off:Lid Switch, exec, hyprmon --profile laptop
+```
+
+When the lid closes, HyprMon will apply the "docked" profile, disable the laptop display, save the configuration, and automatically migrate workspaces to the external monitor. When the lid opens, the "laptop" profile restores the internal display.
+
+> **Note**: You may need to set `HandleLidSwitch=ignore` in `/etc/systemd/logind.conf` to prevent systemd from suspending the laptop when the lid closes.
+
 ## Configuration
 
 HyprMon reads and writes to your Hyprland configuration file. The location is determined in this order:
