@@ -98,6 +98,7 @@ make profiles
 2. User edits in UI → `Monitor` struct updates → `hyprctl keyword monitor` → Hyprland (uses connector Name)
 3. Save action → `Monitor` struct → Update hyprland.conf monitor lines (uses connector Name)
 4. Profile save/load → JSON keyed by HardwareID for stable matching across port changes
+5. Per-monitor `UseDescFormat` preference: stored by HardwareID in `~/.config/hyprmon/settings.json` and also serialized into profile JSON; when true, `generateMonitorLine` writes `monitor=desc:<description>,…` to hyprland.conf in place of the connector name. `applyMonitor` is unaffected — live `hyprctl keyword monitor` continues to use the connector name.
 
 ### Profile Storage Structure
 ```json
@@ -175,3 +176,4 @@ The codebase tracks active/focused monitors through the Hyprland JSON API:
 - Profiles: `~/.config/hyprmon/profiles/` (or custom via `--cfg` flag)
 - Profile order: `~/.config/hyprmon/profiles/.profile_order`
 - Config backups: `hyprland.conf.bak.<timestamp>`
+- HyprMon settings: `~/.config/hyprmon/settings.json` (or custom via `--cfg` flag) — per-monitor preferences keyed by HardwareID
