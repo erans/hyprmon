@@ -220,6 +220,26 @@ When the lid closes, HyprMon will apply the "docked" profile, disable the laptop
 
 > **Note**: You may need to set `HandleLidSwitch=ignore` in `/etc/systemd/logind.conf` to prevent systemd from suspending the laptop when the lid closes.
 
+### Stable monitor matching with `desc:` format
+
+By default, HyprMon writes monitor lines keyed by connector name (e.g., `monitor=DP-9,…`). For daisy-chained or otherwise indistinguishable monitors, the kernel may assign connector names in a different order across reboots or replugs, which swaps monitor positions.
+
+Hyprland supports matching by EDID description instead:
+
+```
+monitor=desc:Dell Inc. DELL U3419W 5HJB6T2,3440x1440@60,0x0,1.00
+```
+
+To opt in per monitor:
+
+1. Select the monitor and press `a` to open advanced settings.
+2. Toggle **Write as desc:** to On.
+3. Save your configuration (`Shift+S`) to write `hyprland.conf` in the new format.
+
+The toggle is unavailable when the monitor has no EDID description, when two or more connected monitors share the same description (typically identical monitors without a serial number), or when the description contains characters Hyprland cannot parse. The preference persists across sessions in `~/.config/hyprmon/settings.json` and is also stored inside any profile you save that includes the monitor.
+
+Live application via `hyprctl` continues to use connector names — the `desc:` format applies only to the persisted `hyprland.conf`.
+
 ## Configuration
 
 HyprMon reads and writes to your Hyprland configuration file. The location is determined in this order:
