@@ -388,8 +388,17 @@ func generateMonitorLine(m Monitor) string {
 		return fmt.Sprintf("# Invalid monitor name: %s", m.Name)
 	}
 
+	// Resolve identifier: desc:<description> when the user opted in and the
+	// description is unambiguous and safe; otherwise the connector name.
+	identifier := m.Name
+	if m.UseDescFormat && canUseDescFormat(m) {
+		if desc := sanitizeDesc(m.EDIDName); desc != "" {
+			identifier = "desc:" + desc
+		}
+	}
+
 	if !m.Active {
-		return fmt.Sprintf("monitor=%s,disable", m.Name)
+		return fmt.Sprintf("monitor=%s,disable", identifier)
 	}
 
 	var monLine string
@@ -398,13 +407,13 @@ func generateMonitorLine(m Monitor) string {
 		if !isValidMonitorName(m.MirrorSource) {
 			return fmt.Sprintf("# Invalid mirror source: %s", m.MirrorSource)
 		}
-		// Mirror syntax: monitor=NAME,resolution,position,scale,mirror,SOURCE_MONITOR
+		// Mirror syntax: monitor=IDENT,resolution,position,scale,mirror,SOURCE_CONNECTOR
 		monLine = fmt.Sprintf("monitor=%s,%dx%d@%.2f,%dx%d,%.2f,mirror,%s",
-			m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale, m.MirrorSource)
+			identifier, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale, m.MirrorSource)
 	} else {
 		// Regular monitor configuration
 		monLine = fmt.Sprintf("monitor=%s,%dx%d@%.2f,%dx%d,%.2f",
-			m.Name, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale)
+			identifier, m.PxW, m.PxH, m.Hz, m.X, m.Y, m.Scale)
 
 		// Add advanced settings (only for non-mirrored monitors)
 		if m.BitDepth == 10 {

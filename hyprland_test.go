@@ -90,3 +90,106 @@ func TestCanUseDescFormat(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateMonitorLineDescFormat(t *testing.T) {
+	base := Monitor{
+		Name:       "DP-9",
+		HardwareID: "Dell Inc./DELL U3419W/5HJB6T2",
+		EDIDName:   "Dell Inc. DELL U3419W 5HJB6T2",
+		PxW:        3440,
+		PxH:        1440,
+		Hz:         60,
+		X:          0,
+		Y:          0,
+		Scale:      1.0,
+		Active:     true,
+	}
+
+	t.Run("desc off writes connector name", func(t *testing.T) {
+		m := base
+		m.UseDescFormat = false
+		got := generateMonitorLine(m)
+		want := "monitor=DP-9,3440x1440@60.00,0x0,1.00"
+		if got != want {
+			t.Errorf("generateMonitorLine() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("desc on writes description line", func(t *testing.T) {
+		m := base
+		m.UseDescFormat = true
+		got := generateMonitorLine(m)
+		want := "monitor=desc:Dell Inc. DELL U3419W 5HJB6T2,3440x1440@60.00,0x0,1.00"
+		if got != want {
+			t.Errorf("generateMonitorLine() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("desc on with disabled monitor", func(t *testing.T) {
+		m := base
+		m.UseDescFormat = true
+		m.Active = false
+		got := generateMonitorLine(m)
+		want := "monitor=desc:Dell Inc. DELL U3419W 5HJB6T2,disable"
+		if got != want {
+			t.Errorf("generateMonitorLine() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("desc on with mirror keeps source connector", func(t *testing.T) {
+		m := base
+		m.UseDescFormat = true
+		m.IsMirrored = true
+		m.MirrorSource = "DP-1"
+		got := generateMonitorLine(m)
+		want := "monitor=desc:Dell Inc. DELL U3419W 5HJB6T2,3440x1440@60.00,0x0,1.00,mirror,DP-1"
+		if got != want {
+			t.Errorf("generateMonitorLine() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("desc on but ambiguous falls back to connector name", func(t *testing.T) {
+		m := base
+		m.UseDescFormat = true
+		m.HardwareID = "Dell Inc./DELL U3419W/#1"
+		got := generateMonitorLine(m)
+		want := "monitor=DP-9,3440x1440@60.00,0x0,1.00"
+		if got != want {
+			t.Errorf("generateMonitorLine() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("desc on but empty description falls back", func(t *testing.T) {
+		m := base
+		m.UseDescFormat = true
+		m.EDIDName = ""
+		got := generateMonitorLine(m)
+		want := "monitor=DP-9,3440x1440@60.00,0x0,1.00"
+		if got != want {
+			t.Errorf("generateMonitorLine() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("desc on but description has comma falls back", func(t *testing.T) {
+		m := base
+		m.UseDescFormat = true
+		m.EDIDName = "Apple Computer Inc., Studio Display"
+		got := generateMonitorLine(m)
+		want := "monitor=DP-9,3440x1440@60.00,0x0,1.00"
+		if got != want {
+			t.Errorf("generateMonitorLine() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("desc on with advanced options", func(t *testing.T) {
+		m := base
+		m.UseDescFormat = true
+		m.BitDepth = 10
+		m.VRR = 1
+		got := generateMonitorLine(m)
+		want := "monitor=desc:Dell Inc. DELL U3419W 5HJB6T2,3440x1440@60.00,0x0,1.00,bitdepth,10,vrr,1"
+		if got != want {
+			t.Errorf("generateMonitorLine() = %q, want %q", got, want)
+		}
+	})
+}
