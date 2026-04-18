@@ -193,3 +193,27 @@ func TestGenerateMonitorLineDescFormat(t *testing.T) {
 		}
 	})
 }
+
+func TestApplyMonitorPrefs(t *testing.T) {
+	monitors := []Monitor{
+		{Name: "DP-9", HardwareID: "Dell Inc./DELL U3419W/5HJB6T2"},
+		{Name: "DP-10", HardwareID: "Dell Inc./DELL U3419W/OTHER"},
+		{Name: "eDP-1", HardwareID: ""},
+	}
+
+	s := &Settings{MonitorPrefs: map[string]MonitorPref{
+		"Dell Inc./DELL U3419W/5HJB6T2": {UseDescFormat: true},
+	}}
+
+	applyMonitorPrefs(monitors, s)
+
+	if !monitors[0].UseDescFormat {
+		t.Errorf("monitors[0] (matching hwid) should have UseDescFormat=true")
+	}
+	if monitors[1].UseDescFormat {
+		t.Errorf("monitors[1] (non-matching hwid) should be unchanged (false)")
+	}
+	if monitors[2].UseDescFormat {
+		t.Errorf("monitors[2] (empty hwid) should be unchanged (false)")
+	}
+}

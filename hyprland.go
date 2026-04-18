@@ -97,6 +97,22 @@ func canUseDescFormat(m Monitor) bool {
 	return sanitizeDesc(m.EDIDName) != ""
 }
 
+// applyMonitorPrefs merges per-monitor preferences from the hyprmon
+// settings file into the given monitor slice. Monitors without a
+// HardwareID are skipped (nothing to key on).
+func applyMonitorPrefs(monitors []Monitor, s *Settings) {
+	if s == nil {
+		return
+	}
+	for i := range monitors {
+		if monitors[i].HardwareID == "" {
+			continue
+		}
+		pref := getMonitorPref(s, monitors[i].HardwareID)
+		monitors[i].UseDescFormat = pref.UseDescFormat
+	}
+}
+
 // execHyprctl executes a hyprctl command with the given arguments and returns the output
 func execHyprctl(args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), hyprctlTimeout)
@@ -231,6 +247,14 @@ func readMonitors() ([]Monitor, error) {
 
 	// Disambiguate monitors with identical HardwareIDs
 	disambiguateHardwareIDs(monitors)
+
+	// Merge per-monitor preferences from hyprmon settings file. Best-effort:
+	// on read errors we log and continue with defaults.
+	if s, err := loadSettings(); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to load hyprmon settings: %v\n", err)
+	} else {
+		applyMonitorPrefs(monitors, s)
+	}
 
 	return monitors, nil
 }
