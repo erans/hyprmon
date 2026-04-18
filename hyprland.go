@@ -67,6 +67,22 @@ func isValidColorMode(mode string) bool {
 	return validModes[mode]
 }
 
+// sanitizeDesc validates and trims an EDID description for use in a
+// monitor=desc:... line. Returns "" when the string is unsafe for the
+// Hyprland parser or for shell-quoted inclusion elsewhere.
+func sanitizeDesc(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	for _, r := range s {
+		if r == ',' || r == '"' || r == '\n' || r < 0x20 {
+			return ""
+		}
+	}
+	return s
+}
+
 // execHyprctl executes a hyprctl command with the given arguments and returns the output
 func execHyprctl(args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), hyprctlTimeout)
