@@ -232,9 +232,9 @@ monitor=desc:Dell Inc. DELL U3419W 5HJB6T2,3440x1440@60,0x0,1.00
 
 To opt in per monitor:
 
-1. Select the monitor and press `a` to open advanced settings.
+1. Select the monitor and press `c` (or `d`) to open advanced settings.
 2. Toggle **Write as desc:** to On.
-3. Save your configuration (`Shift+S`) to write `hyprland.conf` in the new format.
+3. Save your configuration (`S`) to write `hyprland.conf` in the new format.
 
 The toggle is unavailable when the monitor has no EDID description, when two or more connected monitors share the same description (typically identical monitors without a serial number), or when the description contains characters Hyprland cannot parse. The preference persists across sessions in `~/.config/hyprmon/settings.json` and is also stored inside any profile you save that includes the monitor.
 

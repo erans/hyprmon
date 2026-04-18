@@ -176,4 +176,4 @@ The codebase tracks active/focused monitors through the Hyprland JSON API:
 - Profiles: `~/.config/hyprmon/profiles/` (or custom via `--cfg` flag)
 - Profile order: `~/.config/hyprmon/profiles/.profile_order`
 - Config backups: `hyprland.conf.bak.<timestamp>`
-- HyprMon settings: `~/.config/hyprmon/settings.json` (per-monitor preferences keyed by HardwareID)
+- HyprMon settings: `~/.config/hyprmon/settings.json` (or custom via `--cfg` flag) — per-monitor preferences keyed by HardwareID
