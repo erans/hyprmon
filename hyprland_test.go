@@ -27,3 +27,66 @@ func TestSanitizeDesc(t *testing.T) {
 		})
 	}
 }
+
+func TestCanUseDescFormat(t *testing.T) {
+	tests := []struct {
+		name    string
+		monitor Monitor
+		want    bool
+	}{
+		{
+			name: "valid description with serial",
+			monitor: Monitor{
+				Name:       "DP-3",
+				HardwareID: "Dell Inc./DELL U3419W/5HJB6T2",
+				EDIDName:   "Dell Inc. DELL U3419W 5HJB6T2",
+			},
+			want: true,
+		},
+		{
+			name: "empty EDIDName",
+			monitor: Monitor{
+				Name:       "DP-3",
+				HardwareID: "Dell Inc./DELL U3419W/5HJB6T2",
+				EDIDName:   "",
+			},
+			want: false,
+		},
+		{
+			name: "ambiguous: disambiguated HardwareID",
+			monitor: Monitor{
+				Name:       "DP-9",
+				HardwareID: "Dell Inc./DELL U3419W/#1",
+				EDIDName:   "Dell Inc. DELL U3419W",
+			},
+			want: false,
+		},
+		{
+			name: "description contains comma",
+			monitor: Monitor{
+				Name:       "DP-3",
+				HardwareID: "Apple Inc./Studio Display/ABC",
+				EDIDName:   "Apple Computer Inc., Apple Studio Display ABC",
+			},
+			want: false,
+		},
+		{
+			name: "empty HardwareID (no EDID make/model)",
+			monitor: Monitor{
+				Name:       "DP-3",
+				HardwareID: "",
+				EDIDName:   "Some Description",
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := canUseDescFormat(tt.monitor)
+			if got != tt.want {
+				t.Errorf("canUseDescFormat() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

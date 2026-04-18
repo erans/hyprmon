@@ -83,6 +83,20 @@ func sanitizeDesc(s string) string {
 	return s
 }
 
+// canUseDescFormat reports whether a monitor can safely be written as
+// monitor=desc:<description>,... A monitor qualifies when it has a
+// non-empty HardwareID that is NOT disambiguated (no /# suffix), and its
+// EDIDName survives sanitizeDesc unchanged (non-empty after sanitization).
+func canUseDescFormat(m Monitor) bool {
+	if m.HardwareID == "" {
+		return false
+	}
+	if strings.Contains(m.HardwareID, "/#") {
+		return false
+	}
+	return sanitizeDesc(m.EDIDName) != ""
+}
+
 // execHyprctl executes a hyprctl command with the given arguments and returns the output
 func execHyprctl(args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), hyprctlTimeout)
