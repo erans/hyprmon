@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -402,5 +404,37 @@ func TestSnapPositionWithCenterAlignment(t *testing.T) {
 				t.Errorf("Expected center alignment guides but none were created")
 			}
 		})
+	}
+}
+
+func TestMonitorUseDescFormatRoundTrip(t *testing.T) {
+	orig := Monitor{
+		Name:          "DP-9",
+		HardwareID:    "Dell Inc./DELL U3419W/5HJB6T2",
+		UseDescFormat: true,
+	}
+
+	data, err := json.Marshal(orig)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var got Monitor
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if !got.UseDescFormat {
+		t.Errorf("UseDescFormat lost in round-trip: got %v, want true", got.UseDescFormat)
+	}
+
+	// omitempty: zero value should not appear in JSON output
+	zero := Monitor{Name: "DP-1"}
+	zeroData, err := json.Marshal(zero)
+	if err != nil {
+		t.Fatalf("marshal zero: %v", err)
+	}
+	if strings.Contains(string(zeroData), "use_desc_format") {
+		t.Errorf("omitempty failed: zero value appeared in JSON: %s", zeroData)
 	}
 }
