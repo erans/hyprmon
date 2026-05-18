@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestGetEffectiveDimensions(t *testing.T) {
@@ -137,6 +139,127 @@ func TestGetEffectiveDimensions(t *testing.T) {
 				t.Errorf("getEffectiveDimensions() height = %d, expected %d", h, tt.expectedH)
 			}
 		})
+	}
+}
+
+func TestUpdateWorldIncludesNegativeCoordinates(t *testing.T) {
+	m := model{
+		World: world{
+			TermW: 120,
+			TermH: 40,
+		},
+		Monitors: []Monitor{
+			{
+				Name:   "Top",
+				X:      640,
+				Y:      -1080,
+				PxW:    2560,
+				PxH:    1080,
+				Scale:  1,
+				Active: true,
+			},
+			{
+				Name:   "LowerLeft",
+				X:      0,
+				Y:      0,
+				PxW:    3840,
+				PxH:    2160,
+				Scale:  1,
+				Active: true,
+			},
+			{
+				Name:   "LowerRight",
+				X:      3840,
+				Y:      0,
+				PxW:    3840,
+				PxH:    2160,
+				Scale:  1,
+				Active: true,
+			},
+		},
+	}
+
+	m.updateWorld()
+
+	if m.World.OffsetX != -worldPaddingPx {
+		t.Fatalf("OffsetX = %d, want %d", m.World.OffsetX, -worldPaddingPx)
+	}
+	if m.World.OffsetY != -1080-worldPaddingPx {
+		t.Fatalf("OffsetY = %d, want %d", m.World.OffsetY, -1080-worldPaddingPx)
+	}
+	if m.World.Width != 7680+worldPaddingPx*2 {
+		t.Fatalf("Width = %d, want %d", m.World.Width, 7680+worldPaddingPx*2)
+	}
+	if m.World.Height != 3240+worldPaddingPx*2 {
+		t.Fatalf("Height = %d, want %d", m.World.Height, 3240+worldPaddingPx*2)
+	}
+
+	topX, topY := m.worldToTerm(640, -1080)
+	if topX <= 0 || topY <= 0 {
+		t.Fatalf("top monitor should render inside padded viewport, got term(%d,%d)", topX, topY)
+	}
+}
+
+func TestUpdateWorldUsesEffectiveDimensionsForBounds(t *testing.T) {
+	m := model{
+		Monitors: []Monitor{
+			{
+				Name:      "Rotated",
+				X:         -100,
+				Y:         -200,
+				PxW:       1920,
+				PxH:       1080,
+				Scale:     1,
+				Transform: 1,
+				Active:    true,
+			},
+		},
+	}
+
+	m.updateWorld()
+
+	if m.World.OffsetX != -100-worldPaddingPx {
+		t.Fatalf("OffsetX = %d, want %d", m.World.OffsetX, -100-worldPaddingPx)
+	}
+	if m.World.OffsetY != -200-worldPaddingPx {
+		t.Fatalf("OffsetY = %d, want %d", m.World.OffsetY, -200-worldPaddingPx)
+	}
+	if m.World.Width != 1080+worldPaddingPx*2 {
+		t.Fatalf("Width = %d, want %d", m.World.Width, 1080+worldPaddingPx*2)
+	}
+	if m.World.Height != 1920+worldPaddingPx*2 {
+		t.Fatalf("Height = %d, want %d", m.World.Height, 1920+worldPaddingPx*2)
+	}
+}
+
+func TestUpdateWorldUsesActualMinimumCoordinates(t *testing.T) {
+	m := model{
+		Monitors: []Monitor{
+			{
+				Name:   "Offset",
+				X:      2000,
+				Y:      1000,
+				PxW:    1920,
+				PxH:    1080,
+				Scale:  1,
+				Active: true,
+			},
+		},
+	}
+
+	m.updateWorld()
+
+	if m.World.OffsetX != 2000-worldPaddingPx {
+		t.Fatalf("OffsetX = %d, want %d", m.World.OffsetX, 2000-worldPaddingPx)
+	}
+	if m.World.OffsetY != 1000-worldPaddingPx {
+		t.Fatalf("OffsetY = %d, want %d", m.World.OffsetY, 1000-worldPaddingPx)
+	}
+	if m.World.Width != 1920+worldPaddingPx*2 {
+		t.Fatalf("Width = %d, want %d", m.World.Width, 1920+worldPaddingPx*2)
+	}
+	if m.World.Height != 1080+worldPaddingPx*2 {
+		t.Fatalf("Height = %d, want %d", m.World.Height, 1080+worldPaddingPx*2)
 	}
 }
 
@@ -404,6 +527,73 @@ func TestSnapPositionWithCenterAlignment(t *testing.T) {
 				t.Errorf("Expected center alignment guides but none were created")
 			}
 		})
+	}
+}
+
+func TestKeyboardMoveUpdatesWorldBounds(t *testing.T) {
+	m := model{
+		GridPx: 32,
+		Snap:   SnapOff,
+		World: world{
+			TermW: 80,
+			TermH: 24,
+		},
+		Selected: 0,
+		Monitors: []Monitor{
+			{
+				Name:   "DP-1",
+				X:      0,
+				Y:      0,
+				PxW:    1920,
+				PxH:    1080,
+				Scale:  1,
+				Active: true,
+			},
+		},
+	}
+	m.updateWorld()
+
+	updated, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyUp})
+	got := updated.(model)
+
+	if got.Monitors[0].Y != -32 {
+		t.Fatalf("monitor Y = %d, want -32", got.Monitors[0].Y)
+	}
+	if got.World.OffsetY != -32-worldPaddingPx {
+		t.Fatalf("OffsetY = %d, want %d", got.World.OffsetY, -32-worldPaddingPx)
+	}
+}
+
+func TestDragEndUpdatesWorldBounds(t *testing.T) {
+	m := model{
+		World: world{
+			TermW: 80,
+			TermH: 24,
+		},
+		Selected: 0,
+		Monitors: []Monitor{
+			{
+				Name:     "DP-1",
+				X:        0,
+				Y:        -64,
+				PxW:      1920,
+				PxH:      1080,
+				Scale:    1,
+				Active:   true,
+				Dragging: true,
+			},
+		},
+	}
+	m.updateWorld()
+	m.Monitors[0].Y = -128
+
+	m.endDrag()
+
+	if m.World.OffsetY != -128-worldPaddingPx {
+		t.Fatalf("OffsetY = %d, want %d", m.World.OffsetY, -128-worldPaddingPx)
+	}
+	if m.Monitors[0].Dragging {
+		t.Fatalf("Dragging = true, want false")
 	}
 }
 

@@ -125,33 +125,51 @@ type revertMsg struct {
 }
 
 func (m *model) updateWorld() {
+	termW := m.World.TermW
+	termH := m.World.TermH
+
 	if len(m.Monitors) == 0 {
 		m.World = world{
 			Width:  defaultWorldWidth,
 			Height: defaultWorldHeight,
+			TermW:  termW,
+			TermH:  termH,
 			Scale:  defaultWorldScale,
 		}
 		return
 	}
 
-	var maxX, maxY int32
-	for _, mon := range m.Monitors {
-		// Use scaled dimensions for world bounds
-		scaledWidth := int32(float32(mon.PxW) / mon.Scale)
-		scaledHeight := int32(float32(mon.PxH) / mon.Scale)
+	firstWidth, firstHeight := m.getEffectiveDimensions(m.Monitors[0])
+	minX := m.Monitors[0].X
+	minY := m.Monitors[0].Y
+	maxX := m.Monitors[0].X + firstWidth
+	maxY := m.Monitors[0].Y + firstHeight
 
-		if mon.X+scaledWidth > maxX {
-			maxX = mon.X + scaledWidth
+	for _, mon := range m.Monitors[1:] {
+		width, height := m.getEffectiveDimensions(mon)
+
+		if mon.X < minX {
+			minX = mon.X
 		}
-		if mon.Y+scaledHeight > maxY {
-			maxY = mon.Y + scaledHeight
+		if mon.Y < minY {
+			minY = mon.Y
+		}
+		if mon.X+width > maxX {
+			maxX = mon.X + width
+		}
+		if mon.Y+height > maxY {
+			maxY = mon.Y + height
 		}
 	}
 
 	m.World = world{
-		Width:  maxX + worldPaddingPx,
-		Height: maxY + worldPaddingPx,
-		Scale:  defaultWorldScale,
+		Width:   maxX - minX + worldPaddingPx*2,
+		Height:  maxY - minY + worldPaddingPx*2,
+		TermW:   termW,
+		TermH:   termH,
+		Scale:   defaultWorldScale,
+		OffsetX: minX - worldPaddingPx,
+		OffsetY: minY - worldPaddingPx,
 	}
 }
 
@@ -249,6 +267,23 @@ func (m *model) endDrag() {
 	mon := &m.Monitors[m.Selected]
 	mon.Dragging = false
 	m.Guides = nil
+	m.updateWorld()
+}
+
+func (m *model) moveSelected(dx, dy int32) {
+	if m.Selected < 0 || m.Selected >= len(m.Monitors) {
+		return
+	}
+
+	mon := &m.Monitors[m.Selected]
+	mon.X += dx
+	mon.Y += dy
+	if m.Snap != SnapOff {
+		mon.X, mon.Y, m.Guides = m.snapPosition(mon, mon.X, mon.Y)
+	} else {
+		m.Guides = nil
+	}
+	m.updateWorld()
 }
 
 func (m *model) snapPosition(mon *Monitor, x, y int32) (int32, int32, []guide) {
