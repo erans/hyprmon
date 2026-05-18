@@ -467,14 +467,6 @@ func getConfigTarget() (configTarget, error) {
 	}, nil
 }
 
-func getConfigPath() string {
-	target, err := getConfigTarget()
-	if err != nil {
-		return ""
-	}
-	return target.Path
-}
-
 func resolveMonitorIdentifier(m Monitor) string {
 	identifier := m.Name
 	if m.UseDescFormat && canUseDescFormat(m) {
