@@ -412,100 +412,28 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "up", "k":
-		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
-			step := int32(m.GridPx)
-			mon := &m.Monitors[m.Selected]
-			mon.Y -= step
-			if m.Snap != SnapOff {
-				mon.X, mon.Y, m.Guides = m.snapPosition(mon, mon.X, mon.Y)
-			} else {
-				m.Guides = nil
-			}
-		}
+		m.moveSelected(0, -int32(m.GridPx))
 
 	case "shift+up", "K":
-		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
-			step := int32(m.GridPx) * 10
-			mon := &m.Monitors[m.Selected]
-			mon.Y -= step
-			if m.Snap != SnapOff {
-				mon.X, mon.Y, m.Guides = m.snapPosition(mon, mon.X, mon.Y)
-			} else {
-				m.Guides = nil
-			}
-		}
+		m.moveSelected(0, -int32(m.GridPx)*10)
 
 	case "down", "j":
-		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
-			step := int32(m.GridPx)
-			mon := &m.Monitors[m.Selected]
-			mon.Y += step
-			if m.Snap != SnapOff {
-				mon.X, mon.Y, m.Guides = m.snapPosition(mon, mon.X, mon.Y)
-			} else {
-				m.Guides = nil
-			}
-		}
+		m.moveSelected(0, int32(m.GridPx))
 
 	case "shift+down", "J":
-		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
-			step := int32(m.GridPx) * 10
-			mon := &m.Monitors[m.Selected]
-			mon.Y += step
-			if m.Snap != SnapOff {
-				mon.X, mon.Y, m.Guides = m.snapPosition(mon, mon.X, mon.Y)
-			} else {
-				m.Guides = nil
-			}
-		}
+		m.moveSelected(0, int32(m.GridPx)*10)
 
 	case "left", "h":
-		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
-			step := int32(m.GridPx)
-			mon := &m.Monitors[m.Selected]
-			mon.X -= step
-			if m.Snap != SnapOff {
-				mon.X, mon.Y, m.Guides = m.snapPosition(mon, mon.X, mon.Y)
-			} else {
-				m.Guides = nil
-			}
-		}
+		m.moveSelected(-int32(m.GridPx), 0)
 
 	case "shift+left", "H":
-		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
-			step := int32(m.GridPx) * 10
-			mon := &m.Monitors[m.Selected]
-			mon.X -= step
-			if m.Snap != SnapOff {
-				mon.X, mon.Y, m.Guides = m.snapPosition(mon, mon.X, mon.Y)
-			} else {
-				m.Guides = nil
-			}
-		}
+		m.moveSelected(-int32(m.GridPx)*10, 0)
 
 	case "right", "l":
-		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
-			step := int32(m.GridPx)
-			mon := &m.Monitors[m.Selected]
-			mon.X += step
-			if m.Snap != SnapOff {
-				mon.X, mon.Y, m.Guides = m.snapPosition(mon, mon.X, mon.Y)
-			} else {
-				m.Guides = nil
-			}
-		}
+		m.moveSelected(int32(m.GridPx), 0)
 
 	case "shift+right":
-		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
-			step := int32(m.GridPx) * 10
-			mon := &m.Monitors[m.Selected]
-			mon.X += step
-			if m.Snap != SnapOff {
-				mon.X, mon.Y, m.Guides = m.snapPosition(mon, mon.X, mon.Y)
-			} else {
-				m.Guides = nil
-			}
-		}
+		m.moveSelected(int32(m.GridPx)*10, 0)
 
 	case "g", "G":
 		grids := []int{1, 8, 16, 32, 64}
