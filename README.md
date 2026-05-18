@@ -234,30 +234,40 @@ To opt in per monitor:
 
 1. Select the monitor and press `c` (or `d`) to open advanced settings.
 2. Toggle **Write as desc:** to On.
-3. Save your configuration (`S`) to write `hyprland.conf` in the new format.
+3. Save your configuration (`S`) to persist the monitor using `desc:` in whichever Hyprland config format is active.
 
 The toggle is unavailable when the monitor has no EDID description, when two or more connected monitors share the same description (typically identical monitors without a serial number), or when the description contains characters Hyprland cannot parse. The preference persists across sessions in `~/.config/hyprmon/settings.json` and is also stored inside any profile you save that includes the monitor.
 
-Live application via `hyprctl` continues to use connector names — the `desc:` format applies only to the persisted `hyprland.conf`.
+Live application via `hyprctl` continues to use connector names — the `desc:` format applies only to persisted config files.
 
 ## Configuration
 
 HyprMon reads and writes to your Hyprland configuration file. The location is determined in this order:
 
-1. `$HYPRLAND_CONFIG` environment variable
-2. `~/.config/hypr/hyprland.conf` (default)
+1. `$HYPRLAND_CONFIG` environment variable. Paths ending in `.lua` use the Lua writer; other paths use the legacy hyprlang writer.
+2. `~/.config/hypr/hyprland.lua` when it exists.
+3. `~/.config/hypr/hyprland.conf` (legacy fallback).
+
+For Lua configs, HyprMon writes monitor rules to `~/.config/hypr/hyprmon.lua` and adds this managed include to `hyprland.lua` if it is not already present:
+
+```lua
+-- hyprmon: managed monitor profile include
+require("hyprmon")
+```
+
+For legacy hyprlang configs, HyprMon keeps the existing behavior and rewrites only the `monitor=` lines in `hyprland.conf`.
 
 ### Backup Files
 
 Before any configuration changes, HyprMon creates a backup:
-- Location: `hyprland.conf.bak.<timestamp>`
+- Location: `<config-file>.bak.<timestamp>`
 - These backups are never automatically deleted
 
 ## How It Works
 
 1. **Reading**: HyprMon uses `hyprctl monitors -j` to read current monitor configuration
 2. **Applying**: Live changes use `hyprctl keyword monitor ...` commands
-3. **Saving**: Updates only the `monitor=` lines in your hyprland.conf
+3. **Saving**: Updates `monitor=` lines in legacy hyprlang config, or updates the managed `hyprmon.lua` sidecar for Lua config
 4. **Rollback**: Maintains previous state for quick reversion
 
 ## Terminal Requirements

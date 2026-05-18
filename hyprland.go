@@ -33,7 +33,22 @@ const (
 	// UI layout constants
 	desktopBorderMargin = 3  // Border (2) + margin (1)
 	desktopFooterHeight = 10 // Height reserved for footer
+
+	hyprmonLuaRequireComment = "-- hyprmon: managed monitor profile include"
+	hyprmonLuaRequireLine    = `require("hyprmon")`
 )
+
+type configFormat int
+
+const (
+	configFormatHyprlang configFormat = iota
+	configFormatLua
+)
+
+type configTarget struct {
+	Path   string
+	Format configFormat
+}
 
 // isValidMonitorName validates that a monitor name is safe to use in commands
 func isValidMonitorName(name string) bool {
@@ -383,26 +398,91 @@ func applyMonitors(monitors []Monitor) error {
 	return nil
 }
 
-func getConfigPath() string {
-	if envPath := os.Getenv("HYPRLAND_CONFIG"); envPath != "" {
-		// Validate that the path is absolute and clean to prevent path traversal
-		cleanPath := filepath.Clean(envPath)
-		if !filepath.IsAbs(cleanPath) {
-			return ""
+func cleanAbsoluteConfigPath(path string) (string, error) {
+	cleanPath := filepath.Clean(path)
+	if !filepath.IsAbs(cleanPath) {
+		return "", fmt.Errorf("config path must be absolute: %s", path)
+	}
+	if strings.Contains(path, "..") {
+		return "", fmt.Errorf("config path must not contain '..': %s", path)
+	}
+	return cleanPath, nil
+}
+
+func configFormatForPath(path string) configFormat {
+	if strings.EqualFold(filepath.Ext(path), ".lua") {
+		return configFormatLua
+	}
+	return configFormatHyprlang
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+func getHyprConfigDir() (string, error) {
+	if xdgConfigHome := os.Getenv("XDG_CONFIG_HOME"); xdgConfigHome != "" {
+		cleanPath := filepath.Clean(xdgConfigHome)
+		if filepath.IsAbs(cleanPath) {
+			return filepath.Join(cleanPath, "hypr"), nil
 		}
-		// Ensure the path doesn't contain directory traversal attempts
-		if strings.Contains(envPath, "..") {
-			return ""
-		}
-		return cleanPath
 	}
 
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("could not determine home directory: %w", err)
+	}
+	return filepath.Join(home, ".config", "hypr"), nil
+}
+
+func getConfigTarget() (configTarget, error) {
+	if envPath := os.Getenv("HYPRLAND_CONFIG"); envPath != "" {
+		cleanPath, err := cleanAbsoluteConfigPath(envPath)
+		if err != nil {
+			return configTarget{}, err
+		}
+		return configTarget{
+			Path:   cleanPath,
+			Format: configFormatForPath(cleanPath),
+		}, nil
 	}
 
-	return filepath.Join(home, ".config", "hypr", "hyprland.conf")
+	hyprDir, err := getHyprConfigDir()
+	if err != nil {
+		return configTarget{}, err
+	}
+
+	luaPath := filepath.Join(hyprDir, "hyprland.lua")
+	if fileExists(luaPath) {
+		return configTarget{
+			Path:   luaPath,
+			Format: configFormatLua,
+		}, nil
+	}
+
+	return configTarget{
+		Path:   filepath.Join(hyprDir, "hyprland.conf"),
+		Format: configFormatHyprlang,
+	}, nil
+}
+
+func getConfigPath() string {
+	target, err := getConfigTarget()
+	if err != nil {
+		return ""
+	}
+	return target.Path
+}
+
+func resolveMonitorIdentifier(m Monitor) string {
+	identifier := m.Name
+	if m.UseDescFormat && canUseDescFormat(m) {
+		if desc := sanitizeDesc(m.EDIDName); desc != "" {
+			identifier = "desc:" + desc
+		}
+	}
+	return identifier
 }
 
 // generateMonitorLine creates the monitor configuration line for a monitor
@@ -414,12 +494,7 @@ func generateMonitorLine(m Monitor) string {
 
 	// Resolve identifier: desc:<description> when the user opted in and the
 	// description is unambiguous and safe; otherwise the connector name.
-	identifier := m.Name
-	if m.UseDescFormat && canUseDescFormat(m) {
-		if desc := sanitizeDesc(m.EDIDName); desc != "" {
-			identifier = "desc:" + desc
-		}
-	}
+	identifier := resolveMonitorIdentifier(m)
 
 	if !m.Active {
 		return fmt.Sprintf("monitor=%s,disable", identifier)
@@ -468,8 +543,75 @@ func generateMonitorLine(m Monitor) string {
 	return monLine
 }
 
+func luaString(s string) string {
+	return fmt.Sprintf("%q", s)
+}
+
+func generateLuaMonitorRule(m Monitor) string {
+	if !isValidMonitorName(m.Name) {
+		return fmt.Sprintf("-- Invalid monitor name: %s", m.Name)
+	}
+
+	identifier := resolveMonitorIdentifier(m)
+	fields := []string{fmt.Sprintf("output = %s", luaString(identifier))}
+
+	if !m.Active {
+		fields = append(fields, "disabled = true")
+		return fmt.Sprintf("hl.monitor({ %s })", strings.Join(fields, ", "))
+	}
+
+	fields = append(fields,
+		fmt.Sprintf("mode = %s", luaString(fmt.Sprintf("%dx%d@%.2f", m.PxW, m.PxH, m.Hz))),
+		fmt.Sprintf("position = %s", luaString(fmt.Sprintf("%dx%d", m.X, m.Y))),
+		fmt.Sprintf("scale = %.2f", m.Scale),
+	)
+
+	if m.IsMirrored && m.MirrorSource != "" {
+		if !isValidMonitorName(m.MirrorSource) {
+			return fmt.Sprintf("-- Invalid mirror source: %s", m.MirrorSource)
+		}
+		fields = append(fields, fmt.Sprintf("mirror = %s", luaString(m.MirrorSource)))
+	} else {
+		if m.BitDepth == 10 {
+			fields = append(fields, "bitdepth = 10")
+		}
+		if m.ColorMode != "" && m.ColorMode != "srgb" && isValidColorMode(m.ColorMode) {
+			fields = append(fields, fmt.Sprintf("cm = %s", luaString(m.ColorMode)))
+		}
+		if m.ColorMode == "hdr" || m.ColorMode == "hdredid" {
+			if m.SDRBrightness != 0 && m.SDRBrightness != 1.0 {
+				fields = append(fields, fmt.Sprintf("sdrbrightness = %.2f", m.SDRBrightness))
+			}
+			if m.SDRSaturation != 0 && m.SDRSaturation != 1.0 {
+				fields = append(fields, fmt.Sprintf("sdrsaturation = %.2f", m.SDRSaturation))
+			}
+		}
+		if m.VRR > 0 {
+			fields = append(fields, fmt.Sprintf("vrr = %d", m.VRR))
+		}
+		if m.Transform > 0 {
+			fields = append(fields, fmt.Sprintf("transform = %d", m.Transform))
+		}
+	}
+
+	return fmt.Sprintf("hl.monitor({ %s })", strings.Join(fields, ", "))
+}
+
 func writeConfig(monitors []Monitor) error {
-	configPath := getConfigPath()
+	target, err := getConfigTarget()
+	if err != nil {
+		return fmt.Errorf("could not determine config path: %w", err)
+	}
+
+	switch target.Format {
+	case configFormatLua:
+		return writeLuaConfig(target.Path, monitors)
+	default:
+		return writeHyprlangConfig(target.Path, monitors)
+	}
+}
+
+func writeHyprlangConfig(configPath string, monitors []Monitor) error {
 	if configPath == "" {
 		return fmt.Errorf("could not determine config path")
 	}
@@ -541,6 +683,83 @@ func writeConfig(monitors []Monitor) error {
 	// Ensure data is written to disk
 	if err = file.Sync(); err != nil {
 		return fmt.Errorf("failed to sync config: %w", err)
+	}
+
+	return nil
+}
+
+func generateLuaMonitorConfig(monitors []Monitor) string {
+	lines := []string{
+		"-- Generated by HyprMon. Manual changes may be overwritten.",
+		"",
+	}
+	for _, m := range monitors {
+		lines = append(lines, generateLuaMonitorRule(m))
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func hasHyprmonLuaRequire(input string) bool {
+	for _, line := range strings.Split(input, "\n") {
+		if strings.TrimSpace(line) == hyprmonLuaRequireLine {
+			return true
+		}
+	}
+	return false
+}
+
+func ensureHyprmonLuaRequire(input string) string {
+	if hasHyprmonLuaRequire(input) {
+		return input
+	}
+
+	if strings.TrimSpace(input) == "" {
+		return hyprmonLuaRequireComment + "\n" + hyprmonLuaRequireLine + "\n"
+	}
+
+	var b strings.Builder
+	b.WriteString(input)
+	if !strings.HasSuffix(input, "\n") {
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+	b.WriteString(hyprmonLuaRequireComment)
+	b.WriteString("\n")
+	b.WriteString(hyprmonLuaRequireLine)
+	b.WriteString("\n")
+	return b.String()
+}
+
+func writeLuaConfig(configPath string, monitors []Monitor) error {
+	if configPath == "" {
+		return fmt.Errorf("could not determine config path")
+	}
+
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, profileDirMode); err != nil {
+		return fmt.Errorf("failed to ensure lua config directory: %w", err)
+	}
+
+	input, err := os.ReadFile(configPath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read lua config: %w", err)
+	}
+
+	if err == nil {
+		backupPath := fmt.Sprintf("%s.bak.%d", configPath, time.Now().Unix())
+		if err := os.WriteFile(backupPath, input, backupFileMode); err != nil {
+			return fmt.Errorf("failed to create backup: %w", err)
+		}
+	}
+
+	sidecarPath := filepath.Join(configDir, "hyprmon.lua")
+	if err := os.WriteFile(sidecarPath, []byte(generateLuaMonitorConfig(monitors)), configFileMode); err != nil {
+		return fmt.Errorf("failed to write lua monitor config: %w", err)
+	}
+
+	mainConfig := ensureHyprmonLuaRequire(string(input))
+	if err := os.WriteFile(configPath, []byte(mainConfig), configFileMode); err != nil {
+		return fmt.Errorf("failed to write lua config include: %w", err)
 	}
 
 	return nil
