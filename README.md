@@ -29,15 +29,11 @@ HyprMon is a TUI (Terminal User Interface) tool for configuring monitors on Arch
 
 ### Arch Linux
 
-[![AUR package](https://repology.org/badge/version-for-repo/aur/hyprmon.svg)](https://repology.org/project/hyprmon/versions)
-
 ```bash
 yay -S hyprmon-bin
 ```
 
 ### Nix
-
-[![nixpkgs unstable package](https://repology.org/badge/version-for-repo/nix_unstable/hyprmon.svg)](https://repology.org/project/hyprmon/versions)
 
 #### Try it!
 
