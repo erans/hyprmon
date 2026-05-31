@@ -293,7 +293,7 @@ func TestGenerateLuaMonitorRule(t *testing.T) {
 	}
 
 	got := generateLuaMonitorRule(m)
-	want := `hl.monitor({ output = "DP-1", mode = "2560x1440@144.00", position = "0x-200", scale = 1.25 })`
+	want := `hl.monitor({ output = "DP-1", mode = "2560x1440@144.00", position = "0x-200", scale = 1.25, disabled = false })`
 	if got != want {
 		t.Fatalf("generateLuaMonitorRule() = %q, want %q", got, want)
 	}
@@ -323,7 +323,7 @@ func TestGenerateLuaMonitorRuleUsesDescFormat(t *testing.T) {
 	}
 
 	got := generateLuaMonitorRule(m)
-	want := `hl.monitor({ output = "desc:Dell Inc. DELL U3419W 5HJB6T2", mode = "3440x1440@60.00", position = "0x0", scale = 1.00 })`
+	want := `hl.monitor({ output = "desc:Dell Inc. DELL U3419W 5HJB6T2", mode = "3440x1440@60.00", position = "0x0", scale = 1.00, disabled = false })`
 	if got != want {
 		t.Fatalf("generateLuaMonitorRule() = %q, want %q", got, want)
 	}
@@ -342,7 +342,7 @@ func TestGenerateLuaMonitorRuleMirrored(t *testing.T) {
 	}
 
 	got := generateLuaMonitorRule(m)
-	want := `hl.monitor({ output = "DP-2", mode = "1920x1080@60.00", position = "0x0", scale = 1.00, mirror = "DP-1" })`
+	want := `hl.monitor({ output = "DP-2", mode = "1920x1080@60.00", position = "0x0", scale = 1.00, disabled = false, mirror = "DP-1" })`
 	if got != want {
 		t.Fatalf("generateLuaMonitorRule() = %q, want %q", got, want)
 	}
@@ -367,7 +367,7 @@ func TestGenerateLuaMonitorRuleAdvanced(t *testing.T) {
 	}
 
 	got := generateLuaMonitorRule(m)
-	want := `hl.monitor({ output = "DP-1", mode = "3840x2160@60.00", position = "0x0", scale = 1.00, bitdepth = 10, cm = "hdr", sdrbrightness = 1.20, sdrsaturation = 0.90, vrr = 1, transform = 1 })`
+	want := `hl.monitor({ output = "DP-1", mode = "3840x2160@60.00", position = "0x0", scale = 1.00, disabled = false, bitdepth = 10, cm = "hdr", sdrbrightness = 1.20, sdrsaturation = 0.90, vrr = 1, transform = 1 })`
 	if got != want {
 		t.Fatalf("generateLuaMonitorRule() = %q, want %q", got, want)
 	}
@@ -477,7 +477,7 @@ func TestWriteConfigUsesLuaSidecarForLua(t *testing.T) {
 		t.Fatalf("failed to read hyprmon.lua: %v", err)
 	}
 	sidecar := string(sidecarData)
-	wantRule := `hl.monitor({ output = "DP-1", mode = "2560x1440@144.00", position = "0x-200", scale = 1.25 })`
+	wantRule := `hl.monitor({ output = "DP-1", mode = "2560x1440@144.00", position = "0x-200", scale = 1.25, disabled = false })`
 	if !strings.Contains(sidecar, wantRule) {
 		t.Fatalf("hyprmon.lua did not contain generated rule %q:\n%s", wantRule, sidecar)
 	}
