@@ -575,7 +575,7 @@ func generateLuaMonitorRule(m Monitor) string {
 		fmt.Sprintf("mode = %s", luaString(fmt.Sprintf("%dx%d@%.2f", m.PxW, m.PxH, m.Hz))),
 		fmt.Sprintf("position = %s", luaString(fmt.Sprintf("%dx%d", m.X, m.Y))),
 		fmt.Sprintf("scale = %.2f", m.Scale),
-		fmt.Sprintf("disabled = false"),
+		"disabled = false",
 	)
 
 	if m.IsMirrored && m.MirrorSource != "" {
