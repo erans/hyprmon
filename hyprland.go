@@ -325,6 +325,25 @@ func parseMode(modeStr string) *Mode {
 }
 
 func applyMonitor(m Monitor) error {
+	target, err := getConfigTarget()
+	if err != nil {
+		return fmt.Errorf("could not determine config path: %w", err)
+	}
+
+	switch target.Format {
+	case configFormatLua:
+		return applyMonitorLua(m)
+	default:
+		return applyMonitorHyprlang(m)
+	}
+}
+
+func applyMonitorLua(m Monitor) error {
+	_, err := execHyprctl("eval", generateLuaMonitorRule(m))
+	return err
+}
+
+func applyMonitorHyprlang(m Monitor) error {
 	// Validate monitor name to prevent command injection
 	if !isValidMonitorName(m.Name) {
 		return fmt.Errorf("invalid monitor name: %s", m.Name)
@@ -556,6 +575,7 @@ func generateLuaMonitorRule(m Monitor) string {
 		fmt.Sprintf("mode = %s", luaString(fmt.Sprintf("%dx%d@%.2f", m.PxW, m.PxH, m.Hz))),
 		fmt.Sprintf("position = %s", luaString(fmt.Sprintf("%dx%d", m.X, m.Y))),
 		fmt.Sprintf("scale = %.2f", m.Scale),
+		fmt.Sprintf("disabled = false"),
 	)
 
 	if m.IsMirrored && m.MirrorSource != "" {
