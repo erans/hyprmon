@@ -40,16 +40,7 @@ jobs:
       run: go vet ./...
 
     - name: Run tests
-      run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
-
-    - name: Upload coverage
-      if: success()
-      uses: codecov/codecov-action@v7
-      with:
-        file: ./coverage.txt
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
+      run: go test -v -race ./...
 
   lint:
     name: Lint
