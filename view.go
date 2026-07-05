@@ -158,6 +158,7 @@ func (m model) renderHelp() string {
 		{"O", "Open profiles page"},
 		{"P", "Save as profile"},
 		{"Z", "Revert to previous configuration"},
+		{"Ctrl+R", "Reload monitors from Hyprland"},
 		{"?", "Show this help"},
 		{"Q / Ctrl+C", "Quit"},
 	}
