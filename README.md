@@ -187,6 +187,13 @@ hyprmon --profile laptop-only
 
 # Interactive profile menu - shows all saved profiles
 hyprmon profiles
+
+# List all available profile names (active profile marked with *)
+hyprmon --list-profiles
+
+# List all profiles formatted as JSON (useful for integration with Waybar, Eww, etc.)
+# Will be formatted as array of objects with "name" and "is_active" keys
+hyprmon --list-profiles --json
 ```
 
 The profile menu allows you to:
