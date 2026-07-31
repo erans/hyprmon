@@ -530,6 +530,22 @@ func TestSnapPositionWithCenterAlignment(t *testing.T) {
 	}
 }
 
+func TestCtrlRReloadsMonitors(t *testing.T) {
+	m := model{}
+	_, cmd := m.handleKey(tea.KeyMsg{Type: tea.KeyCtrlR})
+	if cmd == nil {
+		t.Fatal("expected reload command for ctrl+r")
+	}
+	msg := cmd()
+	init, ok := msg.(initMsg)
+	if !ok {
+		t.Fatalf("reload command returned %T, want initMsg", msg)
+	}
+	if init.err == nil && init.monitors == nil {
+		t.Fatal("expected monitors or error from reload command")
+	}
+}
+
 func TestKeyboardMoveUpdatesWorldBounds(t *testing.T) {
 	m := model{
 		GridPx: 32,

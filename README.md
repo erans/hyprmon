@@ -104,6 +104,7 @@ hyprmon profiles
 | `S` | Save changes to configuration file |
 | `P` | Save current layout as named profile |
 | `Z` | Revert to previous configuration |
+| `Ctrl+R` | Reload monitors from Hyprland |
 | `Q` or `Ctrl+C` | Quit |
 
 ### Mouse Controls

@@ -512,6 +512,10 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "z", "Z":
 		return m, revertCmd()
 
+	case "ctrl+r":
+		m.Status = "Reloading monitors..."
+		return m, reloadMonitorsCmd()
+
 	case "o", "O":
 		// Open profiles page
 		m.OpenProfiles = true
