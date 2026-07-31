@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -10,6 +11,11 @@ import (
 	"golang.org/x/term"
 )
 
+type ListProfilesItem struct {
+	Name     string `json:"name"`
+	IsActive bool   `json:"is_active"`
+}
+
 func main() {
 	var profileName string
 	var showProfileMenu bool
@@ -17,6 +23,7 @@ func main() {
 	var showActiveProfile bool
 	var showVersion bool
 	var configPath string
+	var jsonOutput bool
 
 	flag.StringVar(&profileName, "profile", "", "Apply a specific profile")
 	flag.BoolVar(&showProfileMenu, "profiles", false, "Show profile selection menu")
@@ -25,6 +32,7 @@ func main() {
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
 	flag.BoolVar(&showVersion, "v", false, "Show version information (short)")
 	flag.StringVar(&configPath, "cfg", "", "Path to store/read configuration files (default: ~/.config/hyprmon)")
+	flag.BoolVar(&jsonOutput, "json", false, "Format output as JSON (only applicable with --list-profiles)")
 	flag.Parse()
 
 	// Set custom config path if provided
@@ -91,14 +99,35 @@ func main() {
 		// Get the currently active profile
 		activeProfile, _ := getCurrentActiveProfile()
 
-		// Print one profile name per line for easy scripting, with * for active profile
-		for _, profile := range profiles {
-			if profile == activeProfile {
-				fmt.Printf("%s *\n", profile)
-			} else {
-				fmt.Println(profile)
+		if jsonOutput {
+			// Convert profiles to struct
+			var profileList []ListProfilesItem
+			for _, profile := range profiles {
+				profileList = append(profileList, ListProfilesItem{
+					Name:     profile,
+					IsActive: profile == activeProfile,
+				})
+			}
+
+			// Marshal to JSON and print
+			jsonData, err := json.Marshal(profileList)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error marshalling profiles to JSON: %v\n", err)
+				os.Exit(1)
+			}
+
+			fmt.Println(string(jsonData))
+		} else {
+			// Print one profile name per line for easy scripting, with * for active profile
+			for _, profile := range profiles {
+				if profile == activeProfile {
+					fmt.Printf("%s *\n", profile)
+				} else {
+					fmt.Println(profile)
+				}
 			}
 		}
+
 		return
 	}
 
