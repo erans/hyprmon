@@ -100,7 +100,8 @@ hyprmon profiles
 | `Enter` or `Space` | Toggle monitor active/inactive |
 | `C` or `D` | Open advanced display settings dialog |
 | `M` | Open monitor mirroring configuration |
-| `V` | Toggle layout between side-by-side and stacked, and apply it live |
+| `V` | Toggle layout between side-by-side and stacked |
+| `X` | Swap monitor order (left ↔ right, or top ↔ bottom) |
 | `A` | Apply changes live to Hyprland |
 | `S` | Save changes to configuration file |
 | `P` | Save current layout as named profile |
