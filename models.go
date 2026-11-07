@@ -1,6 +1,9 @@
 package main
 
 import (
+	"slices"
+	"sort"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -385,4 +388,111 @@ func (m *model) canDisableMonitor(index int) bool {
 	}
 
 	return m.countActiveMonitors() > 1
+}
+
+// toggleOrientation switches the active monitors between a side-by-side
+// (horizontal) row and a stacked (vertical) column. Monitor order is kept
+// (left→right becomes top→bottom and vice versa), each monitor is centered on
+// the cross axis, and the arrangement stays anchored at the original top-left
+// corner. Inactive and mirrored monitors are left untouched. It returns the
+// new orientation ("vertical" or "horizontal"), or "" if fewer than two
+// monitors take part.
+func (m *model) toggleOrientation() string {
+	return m.arrangeMonitors(true, false)
+}
+
+// swapMonitorOrder reverses the order of the active monitors along the current
+// layout axis (left↔right in a row, top↔bottom in a column), keeping the
+// orientation. It returns the orientation, or "" if fewer than two monitors
+// take part.
+func (m *model) swapMonitorOrder() string {
+	return m.arrangeMonitors(false, true)
+}
+
+// arrangeMonitors lays the active, non-mirrored monitors out in a single row or
+// column. The current orientation is detected from the spread of monitor
+// centers; flip switches it, reverse reverses the monitor order.
+func (m *model) arrangeMonitors(flip, reverse bool) string {
+	var idx []int
+	for i, mon := range m.Monitors {
+		if mon.Active && !mon.IsMirrored {
+			idx = append(idx, i)
+		}
+	}
+	if len(idx) < 2 {
+		return ""
+	}
+
+	// Measure the spread of monitor centers on each axis to decide which way
+	// they are laid out now.
+	var minCX, maxCX, minCY, maxCY, minX, minY int32
+	for n, i := range idx {
+		mon := m.Monitors[i]
+		w, h := m.getEffectiveDimensions(mon)
+		cx, cy := mon.X+w/2, mon.Y+h/2
+		if n == 0 {
+			minCX, maxCX, minCY, maxCY = cx, cx, cy, cy
+			minX, minY = mon.X, mon.Y
+			continue
+		}
+		minCX, maxCX = min32(minCX, cx), max(maxCX, cx)
+		minCY, maxCY = min32(minCY, cy), max(maxCY, cy)
+		minX, minY = min32(minX, mon.X), min32(minY, mon.Y)
+	}
+	wasHorizontal := maxCX-minCX >= maxCY-minCY
+	toVertical := wasHorizontal == flip
+
+	// Keep (or reverse) the existing order along the current main axis.
+	sort.SliceStable(idx, func(a, b int) bool {
+		ma, mb := m.Monitors[idx[a]], m.Monitors[idx[b]]
+		if wasHorizontal {
+			return ma.X < mb.X
+		}
+		return ma.Y < mb.Y
+	})
+	if reverse {
+		slices.Reverse(idx)
+	}
+
+	// The widest (for a column) or tallest (for a row) monitor sets the
+	// cross-axis span that the others are centered within.
+	var span int32
+	for _, i := range idx {
+		w, h := m.getEffectiveDimensions(m.Monitors[i])
+		if toVertical {
+			span = max(span, w)
+		} else {
+			span = max(span, h)
+		}
+	}
+
+	var offset int32
+	for _, i := range idx {
+		mon := &m.Monitors[i]
+		w, h := m.getEffectiveDimensions(*mon)
+		if toVertical {
+			mon.X = minX + (span-w)/2
+			mon.Y = minY + offset
+			offset += h
+		} else {
+			mon.X = minX + offset
+			mon.Y = minY + (span-h)/2
+			offset += w
+		}
+	}
+
+	m.Guides = nil
+	m.updateWorld()
+	if toVertical {
+		return "vertical"
+	}
+	return "horizontal"
+}
+
+// min32 exists because view.go declares an int-only min that shadows the builtin.
+func min32(a, b int32) int32 {
+	if a < b {
+		return a
+	}
+	return b
 }

@@ -473,6 +473,26 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ShowModePicker = true
 		}
 
+	case "v", "V":
+		// Toggle between side-by-side and stacked layouts (applied with A)
+		orientation := m.toggleOrientation()
+		if orientation == "" {
+			m.Status = "Need at least two active monitors to change orientation"
+			return m, nil
+		}
+		m.Status = fmt.Sprintf("Layout: %s (A to apply, S to save)", orientation)
+		return m, nil
+
+	case "x", "X":
+		// Swap monitor order (top↔bottom or left↔right) (applied with A)
+		orientation := m.swapMonitorOrder()
+		if orientation == "" {
+			m.Status = "Need at least two active monitors to swap"
+			return m, nil
+		}
+		m.Status = fmt.Sprintf("Swapped monitors, %s layout (A to apply, S to save)", orientation)
+		return m, nil
+
 	case "m", "M":
 		// Open mirror picker for selected monitor
 		if m.Selected >= 0 && m.Selected < len(m.Monitors) {
