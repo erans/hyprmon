@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 func TestToggleOrientationRoundTrip(t *testing.T) {
 	m := model{
@@ -106,5 +111,23 @@ func TestSwapMonitorOrderNeedsTwoMonitors(t *testing.T) {
 	m := model{Monitors: []Monitor{{Name: "A", PxW: 1920, PxH: 1080, Scale: 1, Active: true}}}
 	if got := m.swapMonitorOrder(); got != "" {
 		t.Fatalf("swap = %q, want empty", got)
+	}
+}
+
+func TestOrientationKeysDoNotApply(t *testing.T) {
+	for _, key := range []string{"v", "x"} {
+		m := model{
+			Monitors: []Monitor{
+				{Name: "A", X: 0, Y: 0, PxW: 1920, PxH: 1080, Scale: 1, Active: true},
+				{Name: "B", X: 1920, Y: 0, PxW: 1920, PxH: 1080, Scale: 1, Active: true},
+			},
+		}
+		next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
+		if st := next.(model).Status; !strings.Contains(st, "A to apply") {
+			t.Fatalf("%q status = %q, key handler not reached", key, st)
+		}
+		if cmd != nil {
+			t.Fatalf("%q returned a command; layout changes should wait for A", key)
+		}
 	}
 }
