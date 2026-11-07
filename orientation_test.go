@@ -59,3 +59,52 @@ func TestToggleOrientationNeedsTwoMonitors(t *testing.T) {
 		t.Fatalf("got %q, want empty", got)
 	}
 }
+
+func TestSwapMonitorOrderVertical(t *testing.T) {
+	m := model{
+		Monitors: []Monitor{
+			// B on top, A (laptop) below it.
+			{Name: "A", X: 560, Y: 1440, PxW: 2880, PxH: 1800, Scale: 2, Active: true},
+			{Name: "B", X: 0, Y: 0, PxW: 2560, PxH: 1440, Scale: 1, Active: true},
+		},
+	}
+	if got := m.swapMonitorOrder(); got != "vertical" {
+		t.Fatalf("swap = %q, want vertical", got)
+	}
+	a, b := m.Monitors[0], m.Monitors[1]
+	// A should now be on top, centered over the wider B.
+	if a.X != (2560-1440)/2 || a.Y != 0 {
+		t.Fatalf("A at %d,%d, want %d,0", a.X, a.Y, (2560-1440)/2)
+	}
+	if b.X != 0 || b.Y != 900 {
+		t.Fatalf("B at %d,%d, want 0,900", b.X, b.Y)
+	}
+
+	// Swapping twice restores the original order.
+	m.swapMonitorOrder()
+	if m.Monitors[1].Y != 0 || m.Monitors[0].Y != 1440 {
+		t.Fatalf("double swap: A.Y=%d B.Y=%d, want 1440 and 0", m.Monitors[0].Y, m.Monitors[1].Y)
+	}
+}
+
+func TestSwapMonitorOrderHorizontal(t *testing.T) {
+	m := model{
+		Monitors: []Monitor{
+			{Name: "A", X: 0, Y: 0, PxW: 1920, PxH: 1080, Scale: 1, Active: true},
+			{Name: "B", X: 1920, Y: 0, PxW: 1920, PxH: 1080, Scale: 1, Active: true},
+		},
+	}
+	if got := m.swapMonitorOrder(); got != "horizontal" {
+		t.Fatalf("swap = %q, want horizontal", got)
+	}
+	if m.Monitors[1].X != 0 || m.Monitors[0].X != 1920 {
+		t.Fatalf("A.X=%d B.X=%d, want 1920 and 0", m.Monitors[0].X, m.Monitors[1].X)
+	}
+}
+
+func TestSwapMonitorOrderNeedsTwoMonitors(t *testing.T) {
+	m := model{Monitors: []Monitor{{Name: "A", PxW: 1920, PxH: 1080, Scale: 1, Active: true}}}
+	if got := m.swapMonitorOrder(); got != "" {
+		t.Fatalf("swap = %q, want empty", got)
+	}
+}

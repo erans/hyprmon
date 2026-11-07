@@ -484,6 +484,17 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		saveRollback(m.Monitors)
 		return m, applyCmd(m.Monitors)
 
+	case "x", "X":
+		// Swap monitor order (top↔bottom or left↔right) and apply it live
+		orientation := m.swapMonitorOrder()
+		if orientation == "" {
+			m.Status = "Need at least two active monitors to swap"
+			return m, nil
+		}
+		m.Status = fmt.Sprintf("Swapped monitors (%s layout; Z to undo, S to save)", orientation)
+		saveRollback(m.Monitors)
+		return m, applyCmd(m.Monitors)
+
 	case "m", "M":
 		// Open mirror picker for selected monitor
 		if m.Selected >= 0 && m.Selected < len(m.Monitors) {

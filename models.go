@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"sort"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -397,6 +398,21 @@ func (m *model) canDisableMonitor(index int) bool {
 // new orientation ("vertical" or "horizontal"), or "" if fewer than two
 // monitors take part.
 func (m *model) toggleOrientation() string {
+	return m.arrangeMonitors(true, false)
+}
+
+// swapMonitorOrder reverses the order of the active monitors along the current
+// layout axis (left↔right in a row, top↔bottom in a column), keeping the
+// orientation. It returns the orientation, or "" if fewer than two monitors
+// take part.
+func (m *model) swapMonitorOrder() string {
+	return m.arrangeMonitors(false, true)
+}
+
+// arrangeMonitors lays the active, non-mirrored monitors out in a single row or
+// column. The current orientation is detected from the spread of monitor
+// centers; flip switches it, reverse reverses the monitor order.
+func (m *model) arrangeMonitors(flip, reverse bool) string {
 	var idx []int
 	for i, mon := range m.Monitors {
 		if mon.Active && !mon.IsMirrored {
@@ -423,16 +439,20 @@ func (m *model) toggleOrientation() string {
 		minCY, maxCY = min32(minCY, cy), max(maxCY, cy)
 		minX, minY = min32(minX, mon.X), min32(minY, mon.Y)
 	}
-	toVertical := maxCX-minCX >= maxCY-minCY
+	wasHorizontal := maxCX-minCX >= maxCY-minCY
+	toVertical := wasHorizontal == flip
 
-	// Keep the existing order along the current main axis.
+	// Keep (or reverse) the existing order along the current main axis.
 	sort.SliceStable(idx, func(a, b int) bool {
 		ma, mb := m.Monitors[idx[a]], m.Monitors[idx[b]]
-		if toVertical {
+		if wasHorizontal {
 			return ma.X < mb.X
 		}
 		return ma.Y < mb.Y
 	})
+	if reverse {
+		slices.Reverse(idx)
+	}
 
 	// The widest (for a column) or tallest (for a row) monitor sets the
 	// cross-axis span that the others are centered within.
